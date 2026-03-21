@@ -7,7 +7,7 @@
 #   ./startup.sh
 #
 # Assumes:
-#   - Python 3.11 venv at ~/scamshield/venv
+#   - Python 3.13 venv at ~/scamshield/venv
 #   - ScamShield repo at ~/scamshield (or adjust SCAMSHIELD_DIR below)
 #   - .env file in ~/scamshield/pi/
 
@@ -23,7 +23,7 @@ echo "=== ScamShield startup $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$LOG_
 # Activate venv
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating Python venv at $VENV_DIR..." | tee -a "$LOG_FILE"
-    python3.11 -m venv "$VENV_DIR"
+    python3.13 -m venv "$VENV_DIR"
     "$VENV_DIR/bin/pip" install --upgrade pip
     "$VENV_DIR/bin/pip" install -r "$PI_DIR/requirements.txt"
 fi

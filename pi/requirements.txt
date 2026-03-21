@@ -18,8 +18,8 @@ pychromecast==13.4.0
 # Twilio SMS
 twilio==9.2.3
 
-# Grove HAT GPIO
-RPi.GPIO==0.7.1
+# Grove HAT GPIO (rpi-lgpio is the Python 3.13-compatible drop-in for RPi.GPIO)
+rpi-lgpio
 # grove.py  # Install separately: pip install grove.py
 
 # Serial (SenseCAP)

@@ -24,9 +24,9 @@ import sensecap
 logger = logging.getLogger(__name__)
 
 WARNING_TEXT = (
-    "Warning! This may be a scam call. "
-    "Please do not give out any personal information, "
-    "gift cards, or money. Stay safe and hang up if unsure."
+    "Warning! This may be a scam. "
+    "Do not share personal info or send money. "
+    "Stay safe and hang up if unsure."
 )
 
 

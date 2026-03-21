@@ -78,7 +78,7 @@ Phone on speakerphone
 
 ## Tech Stack
 
-**Pi (Python 3.11)**
+**Pi (Python 3.13)**
 - `openai-whisper` — local speech-to-text (tiny.en model)
 - `google-generativeai` — Gemini 1.5 Flash scam scoring
 - `elevenlabs` — pre-generates warning audio at startup
@@ -152,7 +152,7 @@ ScamShield/
 ### Prerequisites
 
 - Raspberry Pi 4B running Raspberry Pi OS (64-bit)
-- Python 3.11
+- Python 3.13
 - Node.js 18+
 - All hardware components connected via Grove Base HAT
 - Accounts: Gemini API, ElevenLabs, Twilio, Auth0, Railway, ngrok, Vercel
@@ -165,7 +165,7 @@ git clone https://github.com/TristanGru/ScamShield.git
 cd ScamShield
 
 # Create and activate venv
-python3.11 -m venv venv
+python3.13 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
