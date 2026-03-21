@@ -13,13 +13,14 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
 
 try:
     from pi.config import (
         GEMINI_API_KEY,
         SCAM_SCORE_THRESHOLD,
         SCAM_KEYWORD_MIN_MATCHES,
+        SKIP_GEMINI,
     )
     from pi.keywords import SCAM_KEYWORDS
 except ImportError:
@@ -27,6 +28,7 @@ except ImportError:
         GEMINI_API_KEY,
         SCAM_SCORE_THRESHOLD,
         SCAM_KEYWORD_MIN_MATCHES,
+        SKIP_GEMINI,
     )
     from keywords import SCAM_KEYWORDS
 
@@ -34,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 _chunks_processed = 0
 _gemini_errors = 0
+_client: Optional[genai.Client] = None
 
 GEMINI_TIMEOUT_SECONDS = 5
 
@@ -53,8 +56,11 @@ Example response: {"score": 85, "reason": "IRS impersonation with gift card dema
 """
 
 
-def _init_gemini() -> None:
-    genai.configure(api_key=GEMINI_API_KEY)
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
 
 
 @dataclass(frozen=True)
@@ -70,17 +76,16 @@ class ScamAnalysis:
 def _call_gemini(text: str) -> Optional[dict]:
     """Call Gemini API. Returns parsed JSON dict or None on failure."""
     global _gemini_errors
+    if SKIP_GEMINI:
+        logger.debug("[Gemini] SCAMSHIELD_SKIP_GEMINI=1 — skipping API call")
+        return None
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        client = _get_client()
         prompt = f"{_SYSTEM_PROMPT}\n\nTranscript:\n{text}"
 
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,
-                max_output_tokens=100,
-            ),
-            request_options={"timeout": GEMINI_TIMEOUT_SECONDS},
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite-preview-06-17",
+            contents=prompt,
         )
 
         raw = response.text.strip()
@@ -171,6 +176,3 @@ def get_metrics() -> dict:
         "chunks_processed": _chunks_processed,
         "gemini_errors": _gemini_errors,
     }
-
-
-_init_gemini()
