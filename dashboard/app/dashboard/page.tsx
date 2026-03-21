@@ -13,7 +13,7 @@ interface PageProps {
 
 export default async function DashboardPage({ searchParams }: PageProps) {
   const session = await getSession();
-  if (!session) redirect("/auth/login");
+  if (!session) redirect("/api/auth/login");
 
   const page = parseInt(searchParams.page ?? "1");
 
