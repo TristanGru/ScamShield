@@ -1,15 +1,14 @@
 """
-stt.py — Speech-to-text using Whisper tiny.en (local, no network required).
+stt.py — Speech-to-text using faster-whisper (CTranslate2, ARM64-compatible).
 
 The model is loaded once at startup and reused for all chunks.
-Audio is passed as in-memory bytes — never written to disk.
+Audio is passed as in-memory bytes — never written to disk long-term.
 """
 
-import io
 import logging
-import time
-import tempfile
 import os
+import tempfile
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +16,13 @@ _model = None
 
 
 def load_model() -> None:
-    """Load Whisper tiny.en model into memory. Call once at startup."""
+    """Load faster-whisper tiny.en model into memory. Call once at startup."""
     global _model
-    import whisper
+    from faster_whisper import WhisperModel
 
-    logger.info("Loading Whisper tiny.en model…")
+    logger.info("Loading faster-whisper tiny.en model (cpu / int8)…")
     t0 = time.monotonic()
-    _model = whisper.load_model("tiny.en")
+    _model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
     elapsed = time.monotonic() - t0
     logger.info("Whisper model loaded in %.1fs", elapsed)
 
@@ -33,15 +32,12 @@ def transcribe(wav_bytes: bytes) -> str:
     Transcribe a WAV bytes object to text.
     Returns empty string on failure — never raises.
 
-    Whisper requires a file path, so we write to a temp file and immediately
-    delete it after transcription. The audio data is NOT persisted — temp file
-    lifetime is milliseconds.
+    faster-whisper accepts a file path, so we write to a short-lived temp file.
     """
     if _model is None:
         logger.error("Whisper model not loaded — call load_model() first")
         return ""
 
-    # Write to a temp file (Whisper API requires file path, not bytes)
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -49,10 +45,10 @@ def transcribe(wav_bytes: bytes) -> str:
             tmp_path = tmp.name
 
         t0 = time.monotonic()
-        result = _model.transcribe(tmp_path, language="en", fp16=False)
+        segments, info = _model.transcribe(tmp_path, language="en", beam_size=1)
+        text = " ".join(seg.text.strip() for seg in segments).strip()
         elapsed = time.monotonic() - t0
 
-        text = result.get("text", "").strip()
         logger.info(
             "Transcribed %d bytes in %.2fs: %r",
             len(wav_bytes),
