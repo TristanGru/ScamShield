@@ -13,7 +13,7 @@ google-generativeai==0.7.2
 elevenlabs==1.2.2
 
 # Google Nest / Chromecast
-pychromecast==13.4.0
+pychromecast>=14.0.0
 
 # Twilio SMS
 twilio==9.2.3
