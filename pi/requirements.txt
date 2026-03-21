@@ -1,22 +1,22 @@
-# ScamShield Pi dependencies — pinned for reproducibility
+# ScamShield Pi dependencies — Python 3.13 / ARM64 compatible
 
-# Audio capture
+# Audio capture (needs: sudo apt install portaudio19-dev python3-dev)
 PyAudio==0.2.14
 
 # Speech-to-text (local Whisper)
-openai-whisper==20231117
+openai-whisper>=20250625
 
-# Gemini API
-google-generativeai==0.7.2
+# Gemini API (google-genai replaces deprecated google-generativeai)
+google-genai>=1.0.0
 
 # ElevenLabs TTS
-elevenlabs==1.2.2
+elevenlabs>=2.0.0
 
 # Google Nest / Chromecast
 pychromecast>=14.0.0
 
 # Twilio SMS
-twilio==9.2.3
+twilio>=9.10.3
 
 # Grove HAT GPIO (rpi-lgpio is the Python 3.13-compatible drop-in for RPi.GPIO)
 rpi-lgpio
@@ -26,24 +26,24 @@ rpi-lgpio
 pyserial==3.5
 
 # FastAPI server
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-pydantic==2.7.1
+fastapi>=0.135.0
+uvicorn[standard]>=0.42.0
+pydantic>=2.12.0
 
 # SQLite async (used by server)
-aiosqlite==0.20.0
+aiosqlite>=0.22.0
 
-# Postgres sync
-psycopg2-binary==2.9.9
+# Postgres sync (>=3.3.3 required for cp313 ARM64 wheel)
+psycopg[binary]>=3.3.3
 
 # Scheduling (sync worker)
 schedule==1.2.2
 
 # Environment variables
-python-dotenv==1.0.1
+python-dotenv>=1.2.0
 
-# HTTP client (Gemini fallback, health checks)
-httpx==0.27.0
+# HTTP client
+httpx>=0.28.0
 
-# Logging / utilities
-structlog==24.2.0
+# Logging
+structlog>=25.0.0

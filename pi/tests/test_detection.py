@@ -138,10 +138,10 @@ def test_score_transcript_whitespace_only():
 def test_call_gemini_strips_markdown_fences():
     """Gemini sometimes returns ```json ... ``` — we must handle that."""
     from pi import detection
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value.text = '```json\n{"score": 55, "reason": "prize scam"}\n```'
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value.text = '```json\n{"score": 55, "reason": "prize scam"}\n```'
 
-    with patch("pi.detection.genai.GenerativeModel", return_value=mock_model):
+    with patch.object(detection, "_client", mock_client):
         result = detection._call_gemini("You've won a prize! Claim your reward now.")
 
     assert result is not None
@@ -150,10 +150,10 @@ def test_call_gemini_strips_markdown_fences():
 
 def test_call_gemini_invalid_json_returns_none():
     from pi import detection
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value.text = "not json at all"
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value.text = "not json at all"
 
-    with patch("pi.detection.genai.GenerativeModel", return_value=mock_model):
+    with patch.object(detection, "_client", mock_client):
         result = detection._call_gemini("some transcript")
 
     assert result is None
@@ -161,10 +161,10 @@ def test_call_gemini_invalid_json_returns_none():
 
 def test_call_gemini_out_of_range_score_returns_none():
     from pi import detection
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value.text = '{"score": 999, "reason": "test"}'
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value.text = '{"score": 999, "reason": "test"}'
 
-    with patch("pi.detection.genai.GenerativeModel", return_value=mock_model):
+    with patch.object(detection, "_client", mock_client):
         result = detection._call_gemini("some transcript")
 
     assert result is None

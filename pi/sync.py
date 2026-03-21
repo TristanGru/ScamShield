@@ -11,8 +11,7 @@ import threading
 import time
 from typing import Optional
 
-import psycopg2
-import psycopg2.extras
+import psycopg
 import schedule
 
 from config import POSTGRES_URL
@@ -25,19 +24,19 @@ _sms_sent_count = 0
 _sync_lag = 0
 
 
-def _get_postgres_connection() -> Optional[psycopg2.extensions.connection]:
+def _get_postgres_connection() -> Optional[psycopg.Connection]:
     if not POSTGRES_URL:
         logger.debug("POSTGRES_URL not set — skipping sync")
         return None
     try:
-        conn = psycopg2.connect(POSTGRES_URL, connect_timeout=5)
+        conn = psycopg.connect(POSTGRES_URL, connect_timeout=5)
         return conn
     except Exception as exc:
         logger.warning("Postgres connection failed: %s", exc)
         return None
 
 
-def _upsert_events(conn: psycopg2.extensions.connection, events: list[dict]) -> list[str]:
+def _upsert_events(conn: psycopg.Connection, events: list[dict]) -> list[str]:
     """Upsert events to Postgres. Returns list of successfully synced IDs."""
     if not events:
         return []

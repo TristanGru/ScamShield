@@ -42,13 +42,14 @@ def _generate_warning_audio() -> bool:
     logger.info("Generating ElevenLabs warning audio…")
     try:
         from elevenlabs.client import ElevenLabs
-        from elevenlabs import save
+        from elevenlabs.play import save
 
         client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-        audio = client.generate(
+        audio = client.text_to_speech.convert(
             text=WARNING_TEXT,
-            voice=ELEVENLABS_VOICE_ID,
-            model="eleven_monolingual_v1",
+            voice_id=ELEVENLABS_VOICE_ID,
+            model_id="eleven_multilingual_v2",
+            output_format="mp3_44100_128",
         )
         save(audio, WARNING_AUDIO_PATH)
         logger.info("warning.mp3 saved to %s", WARNING_AUDIO_PATH)
@@ -59,13 +60,14 @@ def _generate_warning_audio() -> bool:
         time.sleep(5)
         try:
             from elevenlabs.client import ElevenLabs
-            from elevenlabs import save
+            from elevenlabs.play import save
 
             client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-            audio = client.generate(
+            audio = client.text_to_speech.convert(
                 text=WARNING_TEXT,
-                voice=ELEVENLABS_VOICE_ID,
-                model="eleven_monolingual_v1",
+                voice_id=ELEVENLABS_VOICE_ID,
+                model_id="eleven_multilingual_v2",
+                output_format="mp3_44100_128",
             )
             save(audio, WARNING_AUDIO_PATH)
             logger.info("warning.mp3 saved (retry succeeded)")

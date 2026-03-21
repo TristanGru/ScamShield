@@ -17,7 +17,7 @@ import re
 import time
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
 
 from config import (
     GEMINI_API_KEY,
@@ -49,25 +49,26 @@ Respond with ONLY valid JSON. No markdown, no explanation outside the JSON.
 Example response: {"score": 85, "reason": "IRS impersonation with gift card demand"}
 """
 
+_client: Optional[genai.Client] = None
 
-def _init_gemini() -> None:
-    genai.configure(api_key=GEMINI_API_KEY)
+
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
 
 
 def _call_gemini(text: str) -> Optional[dict]:
     """Call Gemini API. Returns parsed JSON dict or None on failure."""
     global _gemini_errors
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        client = _get_client()
         prompt = f"{_SYSTEM_PROMPT}\n\nTranscript:\n{text}"
 
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,
-                max_output_tokens=100,
-            ),
-            request_options={"timeout": GEMINI_TIMEOUT_SECONDS},
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
         )
 
         raw = response.text.strip()
@@ -138,7 +139,3 @@ def get_metrics() -> dict:
         "chunks_processed": _chunks_processed,
         "gemini_errors": _gemini_errors,
     }
-
-
-# Initialize Gemini on module load
-_init_gemini()
