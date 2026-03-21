@@ -1,52 +1,62 @@
 """
-stt.py — Speech-to-text using faster-whisper (CTranslate2, ARM64-compatible).
+stt.py — Speech-to-text using Vosk (offline, ARM64/Pi 4 compatible).
 
-The model is loaded once at startup and reused for all chunks.
-Audio is passed as in-memory bytes — never written to disk long-term.
+The model is downloaded once on first run and reused for all chunks.
+Audio is passed as in-memory WAV bytes — never persisted.
 """
 
+import io
+import json
 import logging
-import os
-import tempfile
 import time
+import wave
 
 logger = logging.getLogger(__name__)
 
 _model = None
 
+VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
+
 
 def load_model() -> None:
-    """Load faster-whisper tiny.en model into memory. Call once at startup."""
+    """Load Vosk English model. Auto-downloads on first run (~40 MB)."""
     global _model
-    from faster_whisper import WhisperModel
+    from vosk import Model, SetLogLevel
 
-    logger.info("Loading faster-whisper tiny.en model (cpu / int8)…")
+    SetLogLevel(-1)
+
+    logger.info("Loading Vosk model '%s' (downloads on first run)…", VOSK_MODEL_NAME)
     t0 = time.monotonic()
-    _model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
+    _model = Model(model_name=VOSK_MODEL_NAME)
     elapsed = time.monotonic() - t0
-    logger.info("Whisper model loaded in %.1fs", elapsed)
+    logger.info("Vosk model loaded in %.1fs", elapsed)
 
 
 def transcribe(wav_bytes: bytes) -> str:
     """
     Transcribe a WAV bytes object to text.
     Returns empty string on failure — never raises.
-
-    faster-whisper accepts a file path, so we write to a short-lived temp file.
     """
     if _model is None:
-        logger.error("Whisper model not loaded — call load_model() first")
+        logger.error("Vosk model not loaded — call load_model() first")
         return ""
 
-    tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp.write(wav_bytes)
-            tmp_path = tmp.name
+        from vosk import KaldiRecognizer
+
+        wf = wave.open(io.BytesIO(wav_bytes), "rb")
+        rec = KaldiRecognizer(_model, wf.getframerate())
+        rec.SetWords(False)
 
         t0 = time.monotonic()
-        segments, info = _model.transcribe(tmp_path, language="en", beam_size=1)
-        text = " ".join(seg.text.strip() for seg in segments).strip()
+        while True:
+            data = wf.readframes(4000)
+            if len(data) == 0:
+                break
+            rec.AcceptWaveform(data)
+
+        result = json.loads(rec.FinalResult())
+        text = result.get("text", "").strip()
         elapsed = time.monotonic() - t0
 
         logger.info(
@@ -58,9 +68,5 @@ def transcribe(wav_bytes: bytes) -> str:
         return text
 
     except Exception as exc:
-        logger.error("Whisper transcription failed: %s", exc)
+        logger.error("Vosk transcription failed: %s", exc)
         return ""
-
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)

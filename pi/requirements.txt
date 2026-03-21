@@ -3,8 +3,8 @@
 # Audio capture (needs: sudo apt install portaudio19-dev python3-dev)
 PyAudio==0.2.14
 
-# Speech-to-text (faster-whisper — CTranslate2, runs on Pi 4 ARM64 without "Illegal instruction")
-faster-whisper>=1.1.0
+# Speech-to-text (Vosk — offline, native ARM64 support, no PyTorch/CTranslate2 needed)
+vosk>=0.3.45
 
 # Gemini API (google-genai replaces deprecated google-generativeai)
 google-genai>=1.0.0
