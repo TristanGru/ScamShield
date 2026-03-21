@@ -109,11 +109,11 @@
 
 ### Phase 1: Raspberry Pi Core (Hours 1–6)
 **Goal**: Working scam detection loop on Pi
-- [ ] Set up Python venv, install dependencies
-- [ ] `audio_capture.py`: record 15s WAV chunks from webcam mic
-- [ ] `scam_detector.py`: send chunk to Gemini, parse confidence + reason
-- [ ] `hardware.py`: GPIO LED control, button interrupt, SenseCAP text
-- [ ] `main.py`: integrate all Pi modules into detection loop
+- [x] Set up Python venv, install dependencies
+- [x] `audio_capture.py`: record 15s WAV chunks from webcam mic (default `CHUNK_DURATION_SECONDS=15`)
+- [x] `scam_detector.py`: Gemini transcript analysis, confidence (0–1) + reason (`pi/scam_detector.py`)
+- [x] `hardware.py`: GPIO LED control, button interrupt, SenseCAP helpers (`pi/hardware.py`)
+- [x] `main.py`: integrate all Pi modules into detection loop
 - **Deliverables**: Pi detects scam audio and triggers LEDs
 
 ### Phase 2: Backend + Notifications (Hours 6–12)

@@ -23,7 +23,7 @@ Phone on speakerphone
  Grove Sound Sensor  ──── voice activity detected ────►  Pi microphone captures audio
         │
         ▼
-  Whisper tiny.en  ──── local speech-to-text ────► 3-second transcript chunk
+  Whisper tiny.en  ──── local speech-to-text ────► 15-second transcript chunk (PRD)
         │
         ▼
   Gemini 1.5 Flash  ──── scam likelihood score 0–100 ────► + keyword fallback

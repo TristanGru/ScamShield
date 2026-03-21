@@ -48,7 +48,7 @@ NGROK_AUTHTOKEN: str = _optional("NGROK_AUTHTOKEN", "")
 # ── Audio ─────────────────────────────────────────────────────────────────────
 AUDIO_DEVICE_INDEX: int = int(_optional("AUDIO_DEVICE_INDEX", "0"))
 VAD_THRESHOLD: int = int(_optional("VAD_THRESHOLD", "500"))
-CHUNK_DURATION_SECONDS: int = int(_optional("CHUNK_DURATION_SECONDS", "3"))
+CHUNK_DURATION_SECONDS: int = int(_optional("CHUNK_DURATION_SECONDS", "15"))
 SAMPLE_RATE: int = 16000
 CHANNELS: int = 1
 SAMPLE_WIDTH: int = 2  # 16-bit
@@ -65,7 +65,7 @@ SENSECAP_SERIAL_PORT: str = _optional("SENSECAP_SERIAL_PORT", "/dev/ttyUSB0")
 SENSECAP_BAUD_RATE: int = int(_optional("SENSECAP_BAUD_RATE", "115200"))
 
 # ── Detection Thresholds ──────────────────────────────────────────────────────
-SCAM_SCORE_THRESHOLD: int = int(_optional("SCAM_SCORE_THRESHOLD", "70"))
+SCAM_SCORE_THRESHOLD: int = int(_optional("SCAM_SCORE_THRESHOLD", "75"))
 SCAM_KEYWORD_MIN_MATCHES: int = int(_optional("SCAM_KEYWORD_MIN_MATCHES", "2"))
 SMS_DEBOUNCE_SECONDS: int = int(_optional("SMS_DEBOUNCE_SECONDS", "60"))
 

@@ -4,32 +4,32 @@ Covers all scoring paths: Gemini success, Gemini failure, keyword-only, no match
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 # ── Keyword matching tests ─────────────────────────────────────────────────────
 
 def test_keyword_match_irs():
-    from detection import _keyword_match
+    from pi.detection import _keyword_match
     result = _keyword_match("This is the IRS calling about your taxes.")
     assert "IRS" in result
 
 
 def test_keyword_match_case_insensitive():
-    from detection import _keyword_match
+    from pi.detection import _keyword_match
     result = _keyword_match("you owe money to the irs right now")
     assert "IRS" in result
 
 
 def test_keyword_match_no_partial_words():
     """BL-002: 'history' should NOT match 'his'."""
-    from detection import _keyword_match
+    from pi.detection import _keyword_match
     result = _keyword_match("I have a long history of working hard.")
     assert len(result) == 0
 
 
 def test_keyword_match_multiple():
-    from detection import _keyword_match
+    from pi.detection import _keyword_match
     text = "The IRS says you must pay with gift cards or face arrest."
     result = _keyword_match(text)
     assert "IRS" in result
@@ -39,13 +39,13 @@ def test_keyword_match_multiple():
 
 
 def test_keyword_match_empty_text():
-    from detection import _keyword_match
+    from pi.detection import _keyword_match
     result = _keyword_match("")
     assert result == []
 
 
 def test_keyword_match_normal_conversation():
-    from detection import _keyword_match
+    from pi.detection import _keyword_match
     result = _keyword_match("Hi grandma, how are you doing today? The weather is nice.")
     assert len(result) == 0
 
@@ -53,36 +53,39 @@ def test_keyword_match_normal_conversation():
 # ── should_alert logic ────────────────────────────────────────────────────────
 
 def test_should_alert_high_score():
-    from detection import should_alert
-    assert should_alert(score=75, keywords=[]) is True
+    from pi.detection import should_alert
+    assert should_alert(score=76, keywords=[]) is True
 
 
 def test_should_alert_threshold_exact():
-    from detection import should_alert
-    assert should_alert(score=70, keywords=[]) is True
+    """PRD: confidence ≥ 0.75 → score ≥ 75 on 0–100 scale."""
+    from pi.detection import should_alert
+    assert should_alert(score=75, keywords=[]) is True
 
 
 def test_should_alert_below_threshold_no_keywords():
-    from detection import should_alert
-    assert should_alert(score=69, keywords=[]) is False
+    from pi.detection import should_alert
+    assert should_alert(score=74, keywords=[]) is False
 
 
 def test_should_alert_keywords_only():
-    from detection import should_alert
+    from pi.detection import should_alert
     assert should_alert(score=0, keywords=["IRS", "gift cards"]) is True
 
 
 def test_should_alert_one_keyword_no_score():
     """One keyword alone should NOT trigger if score is below threshold."""
-    from detection import should_alert
+    from pi.detection import should_alert
     assert should_alert(score=0, keywords=["IRS"]) is False
 
 
 # ── score_transcript — Gemini success ────────────────────────────────────────
 
 def test_score_transcript_gemini_success():
-    import detection
-    with patch.object(detection, "_call_gemini", return_value={"score": 87, "reason": "IRS impersonation"}):
+    from pi import detection
+    from pi import scam_detector as sd
+
+    with patch.object(sd, "_call_gemini", return_value={"score": 87, "reason": "IRS impersonation"}):
         score, keywords = detection.score_transcript(
             "This is the IRS. You owe $5,000. Pay with gift cards."
         )
@@ -94,8 +97,10 @@ def test_score_transcript_gemini_success():
 # ── score_transcript — Gemini failure fallback ────────────────────────────────
 
 def test_score_transcript_gemini_failure_keyword_fallback():
-    import detection
-    with patch.object(detection, "_call_gemini", return_value=None):
+    from pi import detection
+    from pi import scam_detector as sd
+
+    with patch.object(sd, "_call_gemini", return_value=None):
         score, keywords = detection.score_transcript(
             "The IRS says you must pay with gift cards immediately or face arrest."
         )
@@ -104,8 +109,10 @@ def test_score_transcript_gemini_failure_keyword_fallback():
 
 
 def test_score_transcript_gemini_failure_no_keywords():
-    import detection
-    with patch.object(detection, "_call_gemini", return_value=None):
+    from pi import detection
+    from pi import scam_detector as sd
+
+    with patch.object(sd, "_call_gemini", return_value=None):
         score, keywords = detection.score_transcript(
             "How is the weather today? I hope it is sunny."
         )
@@ -116,14 +123,14 @@ def test_score_transcript_gemini_failure_no_keywords():
 # ── score_transcript — empty input ───────────────────────────────────────────
 
 def test_score_transcript_empty_string():
-    import detection
+    from pi import detection
     score, keywords = detection.score_transcript("")
     assert score == 0
     assert keywords == []
 
 
 def test_score_transcript_whitespace_only():
-    import detection
+    from pi import detection
     score, keywords = detection.score_transcript("   \n  ")
     assert score == 0
     assert keywords == []
@@ -133,11 +140,12 @@ def test_score_transcript_whitespace_only():
 
 def test_call_gemini_strips_markdown_fences():
     """Gemini sometimes returns ```json ... ``` — we must handle that."""
-    import detection
+    from pi import detection
+    from pi import scam_detector as sd
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value.text = '```json\n{"score": 55, "reason": "prize scam"}\n```'
 
-    with patch.object(detection, "_client", mock_client):
+    with patch.object(sd, "_client", mock_client):
         result = detection._call_gemini("You've won a prize! Claim your reward now.")
 
     assert result is not None
@@ -145,22 +153,24 @@ def test_call_gemini_strips_markdown_fences():
 
 
 def test_call_gemini_invalid_json_returns_none():
-    import detection
+    from pi import detection
+    from pi import scam_detector as sd
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value.text = "not json at all"
 
-    with patch.object(detection, "_client", mock_client):
+    with patch.object(sd, "_client", mock_client):
         result = detection._call_gemini("some transcript")
 
     assert result is None
 
 
 def test_call_gemini_out_of_range_score_returns_none():
-    import detection
+    from pi import detection
+    from pi import scam_detector as sd
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value.text = '{"score": 999, "reason": "test"}'
 
-    with patch.object(detection, "_client", mock_client):
+    with patch.object(sd, "_client", mock_client):
         result = detection._call_gemini("some transcript")
 
     assert result is None

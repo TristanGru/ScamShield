@@ -26,15 +26,18 @@ from config import (
     TWILIO_AUTH_TOKEN,
     TWILIO_FROM_NUMBER,
     TWILIO_TO_NUMBER,
-    GPIO_LED_RED_PIN,
-    GPIO_LED_GREEN_PIN,
-    GPIO_BUZZER_PIN,
     SMS_DEBOUNCE_SECONDS,
     LED_RESET_SECONDS,
     WARNING_AUDIO_PATH,
 )
 import db
+import hardware
 import sensecap
+
+# Re-export for tests and callers that patch LED helpers
+set_led_red = hardware.set_led_red
+set_led_green = hardware.set_led_green
+sound_buzzer = hardware.sound_buzzer
 
 logger = logging.getLogger(__name__)
 
@@ -49,56 +52,6 @@ _sms_lock = threading.Lock()
 # Nest reference (set by startup.py)
 _nest_cast = None
 _nest_connected = False
-
-# Try GPIO
-try:
-    import RPi.GPIO as GPIO
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(GPIO_LED_RED_PIN, GPIO.OUT, initial=GPIO.LOW)
-    GPIO.setup(GPIO_LED_GREEN_PIN, GPIO.OUT, initial=GPIO.HIGH)
-    GPIO.setup(GPIO_BUZZER_PIN, GPIO.OUT, initial=GPIO.LOW)
-    _GPIO_AVAILABLE = True
-    logger.info("GPIO initialized — LED/Buzzer ready")
-except (ImportError, RuntimeError) as exc:
-    GPIO = None
-    _GPIO_AVAILABLE = False
-    logger.warning("GPIO not available: %s", exc)
-
-
-# ── GPIO helpers ──────────────────────────────────────────────────────────────
-
-def set_led_red() -> None:
-    if not _GPIO_AVAILABLE or GPIO is None:
-        logger.debug("[SIM] LED → RED")
-        return
-    try:
-        GPIO.output(GPIO_LED_RED_PIN, GPIO.HIGH)
-        GPIO.output(GPIO_LED_GREEN_PIN, GPIO.LOW)
-    except Exception as exc:
-        logger.error("LED red failed: %s", exc)
-
-
-def set_led_green() -> None:
-    if not _GPIO_AVAILABLE or GPIO is None:
-        logger.debug("[SIM] LED → GREEN")
-        return
-    try:
-        GPIO.output(GPIO_LED_RED_PIN, GPIO.LOW)
-        GPIO.output(GPIO_LED_GREEN_PIN, GPIO.HIGH)
-    except Exception as exc:
-        logger.error("LED green failed: %s", exc)
-
-
-def sound_buzzer(duration: float = 2.0) -> None:
-    if not _GPIO_AVAILABLE or GPIO is None:
-        logger.debug("[SIM] BUZZER for %.1fs", duration)
-        return
-    try:
-        GPIO.output(GPIO_BUZZER_PIN, GPIO.HIGH)
-        time.sleep(duration)
-        GPIO.output(GPIO_BUZZER_PIN, GPIO.LOW)
-    except Exception as exc:
-        logger.error("Buzzer failed: %s", exc)
 
 
 def set_nest_cast(cast_device) -> None:
@@ -256,8 +209,4 @@ def get_metrics() -> dict:
 
 def cleanup_gpio() -> None:
     """Call on shutdown to clean up GPIO state."""
-    if _GPIO_AVAILABLE and GPIO is not None:
-        try:
-            GPIO.cleanup()
-        except Exception:
-            pass
+    hardware.cleanup_gpio()

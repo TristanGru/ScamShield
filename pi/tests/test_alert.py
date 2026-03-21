@@ -3,7 +3,6 @@ test_alert.py — Unit tests for alert.py.
 All external calls (Nest, GPIO, Twilio, DB, SenseCAP) are mocked.
 """
 
-import threading
 import time
 from unittest.mock import MagicMock, patch, call
 
@@ -27,31 +26,34 @@ def _reset_alert_module():
 def test_set_led_red_sim(caplog):
     """GPIO unavailable → [SIM] log, no crash."""
     import pi.alert as alert_mod
-    original = alert_mod._GPIO_AVAILABLE
-    alert_mod._GPIO_AVAILABLE = False
-    with caplog.at_level("DEBUG", logger="pi.alert"):
+    import pi.hardware as hw
+    original = hw._GPIO_AVAILABLE
+    hw._GPIO_AVAILABLE = False
+    with caplog.at_level("DEBUG", logger="pi.hardware"):
         alert_mod.set_led_red()
-    alert_mod._GPIO_AVAILABLE = original
+    hw._GPIO_AVAILABLE = original
     assert any("RED" in r.message for r in caplog.records)
 
 
 def test_set_led_green_sim(caplog):
     import pi.alert as alert_mod
-    original = alert_mod._GPIO_AVAILABLE
-    alert_mod._GPIO_AVAILABLE = False
-    with caplog.at_level("DEBUG", logger="pi.alert"):
+    import pi.hardware as hw
+    original = hw._GPIO_AVAILABLE
+    hw._GPIO_AVAILABLE = False
+    with caplog.at_level("DEBUG", logger="pi.hardware"):
         alert_mod.set_led_green()
-    alert_mod._GPIO_AVAILABLE = original
+    hw._GPIO_AVAILABLE = original
     assert any("GREEN" in r.message for r in caplog.records)
 
 
 def test_sound_buzzer_sim(caplog):
     import pi.alert as alert_mod
-    original = alert_mod._GPIO_AVAILABLE
-    alert_mod._GPIO_AVAILABLE = False
-    with caplog.at_level("DEBUG", logger="pi.alert"):
+    import pi.hardware as hw
+    original = hw._GPIO_AVAILABLE
+    hw._GPIO_AVAILABLE = False
+    with caplog.at_level("DEBUG", logger="pi.hardware"):
         alert_mod.sound_buzzer(duration=0.01)
-    alert_mod._GPIO_AVAILABLE = original
+    hw._GPIO_AVAILABLE = original
     assert any("BUZZER" in r.message for r in caplog.records)
 
 
@@ -117,7 +119,7 @@ def test_send_sms_debounce():
 def test_send_sms_debounce_expires():
     """After debounce window, SMS should send again."""
     import pi.alert as alert_mod
-    from config import SMS_DEBOUNCE_SECONDS
+    from pi.config import SMS_DEBOUNCE_SECONDS
     _reset_alert_module()
 
     # Pretend last SMS was sent slightly more than debounce ago

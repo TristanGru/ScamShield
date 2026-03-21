@@ -45,5 +45,8 @@ python-dotenv>=1.2.0
 # HTTP client
 httpx>=0.28.0
 
-# Logging
-structlog>=25.0.0
+# Logging / utilities
+structlog==24.2.0
+
+# Tests
+pytest>=8.0.0
