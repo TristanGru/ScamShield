@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 _model = None
 
-VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
+VOSK_MODEL_NAME = "vosk-model-en-us-0.22"
 
 
 def load_model() -> None:
