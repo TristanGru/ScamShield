@@ -16,6 +16,7 @@ from config import (
     ELEVENLABS_API_KEY,
     ELEVENLABS_VOICE_ID,
     NGROK_AUTHTOKEN,
+    TEXT_ONLY_MODE,
     WARNING_AUDIO_PATH,
 )
 import db
@@ -35,6 +36,16 @@ def _generate_warning_audio() -> bool:
     Generate ElevenLabs TTS warning.mp3 and cache it locally.
     Returns True if successful. Falls back to Nest native TTS on failure (BL-005, EC-011).
     """
+    if TEXT_ONLY_MODE:
+        logger.info(
+            "[ElevenLabs] (text-only) Would synthesize MP3 → %s\n"
+            "Voice ID from env | model eleven_multilingual_v2\n"
+            "Script:\n%s",
+            WARNING_AUDIO_PATH,
+            WARNING_TEXT,
+        )
+        return False
+
     if os.getenv("ELEVENLABS_SKIP_WARNING", "").lower() in ("1", "true", "yes"):
         logger.warning(
             "ELEVENLABS_SKIP_WARNING set — skipping ElevenLabs (no warning.mp3; use Nest fallback)"
@@ -62,6 +73,14 @@ def _generate_warning_audio() -> bool:
         return True
 
     except Exception as exc:
+        err_s = str(exc).lower()
+        if "402" in str(exc) or "payment_required" in err_s or "paid_plan" in err_s:
+            logger.error(
+                "ElevenLabs blocked (plan/voice) — set ELEVENLABS_SKIP_WARNING=1 or change "
+                "ELEVENLABS_VOICE_ID; Nest will use fallback. Details: %s",
+                exc,
+            )
+            return False
         logger.error("ElevenLabs generation failed: %s — retrying once (EC-011)", exc)
         time.sleep(5)
         try:
@@ -88,6 +107,21 @@ def _discover_nest():
     Discover the first Google Nest/Chromecast on the local network.
     Returns cast device or None (EC-002).
     """
+    if TEXT_ONLY_MODE:
+        logger.info(
+            "[Google Nest] (text-only) mDNS / Chromecast discovery skipped.\n"
+            "On each alert, would cast: file://%s (ElevenLabs MP3 or fallback).",
+            WARNING_AUDIO_PATH,
+        )
+        return None
+
+    if os.getenv("SKIP_NEST_DISCOVERY", "").lower() in ("1", "true", "yes"):
+        logger.warning(
+            "SKIP_NEST_DISCOVERY set — Nest/Chromecast disabled "
+            "(set NEST_IP + fix zeroconf, or remove this flag to enable)"
+        )
+        return None
+
     import pychromecast
 
     nest_ip = os.getenv("NEST_IP")
@@ -170,6 +204,11 @@ def run_startup() -> dict:
     Returns a dict with: nest_connected, warning_audio_ok, ngrok_url
     """
     logger.info("=== ScamShield Startup ===")
+    if TEXT_ONLY_MODE:
+        logger.warning(
+            "SCAMSHIELD_TEXT_ONLY=1 — ElevenLabs, Nest, and SenseCAP hardware are OFF; "
+            "see log lines tagged [ElevenLabs], [Google Nest], [SenseCAP]."
+        )
     sensecap.connect()
     sensecap.set_ready()
 

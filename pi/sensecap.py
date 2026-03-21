@@ -17,7 +17,7 @@ from typing import Optional
 
 import serial
 
-from config import SENSECAP_SERIAL_PORT, SENSECAP_BAUD_RATE
+from config import SENSECAP_SERIAL_PORT, SENSECAP_BAUD_RATE, TEXT_ONLY_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,13 @@ _lock = threading.Lock()
 def connect() -> bool:
     """Open the SenseCAP serial port. Returns True if successful."""
     global _serial
+    if TEXT_ONLY_MODE:
+        logger.info(
+            "[SenseCAP] (text-only) Would open serial: %s @ %d baud — not connecting.",
+            SENSECAP_SERIAL_PORT,
+            SENSECAP_BAUD_RATE,
+        )
+        return True
     try:
         _serial = serial.Serial(
             port=SENSECAP_SERIAL_PORT,
@@ -44,6 +51,9 @@ def connect() -> bool:
 
 def _send(command: str) -> None:
     """Send a command line to SenseCAP. Thread-safe. Silent on failure."""
+    if TEXT_ONLY_MODE:
+        logger.info("[SenseCAP] (text-only) %s", command)
+        return
     if _serial is None or not _serial.is_open:
         return
     try:
@@ -86,6 +96,10 @@ def set_transcript(text: str) -> None:
 
 def disconnect() -> None:
     global _serial
+    if TEXT_ONLY_MODE:
+        logger.info("[SenseCAP] (text-only) disconnect — no serial open.")
+        _serial = None
+        return
     if _serial and _serial.is_open:
         _serial.close()
     _serial = None

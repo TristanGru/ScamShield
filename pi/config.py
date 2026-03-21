@@ -74,3 +74,7 @@ LED_RESET_SECONDS: int = 10
 
 # ── Warning audio cache path ──────────────────────────────────────────────────
 WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
+
+# ── Text-only mode (no ElevenLabs API, Nest/Chromecast, or SenseCAP serial) ───
+# Set SCAMSHIELD_TEXT_ONLY=1 for dev/demo — integrations are logged/printed as plain text.
+TEXT_ONLY_MODE: bool = _optional("SCAMSHIELD_TEXT_ONLY", "0").lower() in ("1", "true", "yes")

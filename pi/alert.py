@@ -28,6 +28,7 @@ from config import (
     TWILIO_TO_NUMBER,
     SMS_DEBOUNCE_SECONDS,
     LED_RESET_SECONDS,
+    TEXT_ONLY_MODE,
     WARNING_AUDIO_PATH,
 )
 import db
@@ -65,6 +66,12 @@ def set_nest_cast(cast_device) -> None:
 
 def _play_nest_warning() -> None:
     """Play pre-cached ElevenLabs warning.mp3 on Google Nest via pychromecast."""
+    if TEXT_ONLY_MODE:
+        logger.info(
+            "[Google Nest] (text-only) Would play on speaker:\n  file://%s",
+            WARNING_AUDIO_PATH,
+        )
+        return
     if _nest_cast is None:
         logger.warning("Nest not connected — skipping Nest audio (EC-002)")
         return
@@ -162,6 +169,25 @@ def fire_alert(
         score,
         keywords,
     )
+
+    if TEXT_ONLY_MODE:
+        keywords_str = ", ".join(keywords) if keywords else "(none)"
+        score_str = str(score) if score is not None else "(n/a)"
+        msg = (
+            f"\n{'═' * 52}\n"
+            f"  SCAMSHIELD — ALERT (text-only mode)\n"
+            f"{'═' * 52}\n"
+            f"  Trigger:      {trigger_type}\n"
+            f"  Scam score:   {score_str}\n"
+            f"  Keywords:     {keywords_str}\n"
+            f"  Transcript:   {transcript[:400]}{'…' if len(transcript) > 400 else ''}\n"
+            f"{'─' * 52}\n"
+            f"  [ElevenLabs] Already described at startup (warning MP3 script).\n"
+            f"  [Google Nest] Would play: file://{WARNING_AUDIO_PATH}\n"
+            f"  [SenseCAP] Would show STATUS: !!! SCAM DETECTED !!! + transcript line.\n"
+            f"{'═' * 52}\n"
+        )
+        print(msg, flush=True)
 
     # Update SenseCAP immediately (synchronous — fast serial write)
     sensecap.set_scam_detected(transcript)
