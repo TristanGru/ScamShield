@@ -50,6 +50,9 @@ dashboard/.vercel/
 Thumbs.db
 desktop.ini
 
+# Local-only notes (not committed)
+GIT_COMMANDS.local.md
+
 # IDE
 .idea/
 .vscode/settings.json

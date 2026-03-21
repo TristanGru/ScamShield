@@ -14,6 +14,11 @@ elevenlabs>=2.0.0
 
 # Google Nest / Chromecast
 pychromecast>=14.0.0
+# Pin: newer zeroconf + pychromecast can raise "Zeroconf instance loop must be running" in background threads (RPi)
+zeroconf==0.131.0
+
+# ngrok tunnel (startup.py)
+pyngrok>=7.0.0
 
 # Twilio SMS
 twilio>=9.10.3

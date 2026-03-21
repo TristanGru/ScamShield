@@ -35,6 +35,12 @@ def _generate_warning_audio() -> bool:
     Generate ElevenLabs TTS warning.mp3 and cache it locally.
     Returns True if successful. Falls back to Nest native TTS on failure (BL-005, EC-011).
     """
+    if os.getenv("ELEVENLABS_SKIP_WARNING", "").lower() in ("1", "true", "yes"):
+        logger.warning(
+            "ELEVENLABS_SKIP_WARNING set — skipping ElevenLabs (no warning.mp3; use Nest fallback)"
+        )
+        return False
+
     if os.path.exists(WARNING_AUDIO_PATH):
         logger.info("warning.mp3 already cached — skipping generation")
         return True
@@ -82,36 +88,60 @@ def _discover_nest():
     Discover the first Google Nest/Chromecast on the local network.
     Returns cast device or None (EC-002).
     """
-    logger.info("Discovering Google Nest via pychromecast…")
+    import pychromecast
+
+    nest_ip = os.getenv("NEST_IP")
+
+    # Prefer direct IP when set — fewer zeroconf/mDNS edge cases on some networks (RPi)
+    if nest_ip:
+        logger.info("Discovering Nest via NEST_IP=%s …", nest_ip)
+        browser2 = None
+        try:
+            chromecasts_by_ip, browser2 = pychromecast.get_listed_chromecasts(
+                friendly_names=None, uuids=None, known_hosts=[nest_ip]
+            )
+            if browser2 is not None:
+                browser2.stop_discovery()
+            if chromecasts_by_ip:
+                cast = chromecasts_by_ip[0]
+                try:
+                    cast.wait()
+                except Exception as wait_exc:
+                    logger.error("Nest cast.wait() failed: %s", wait_exc)
+                    return None
+                logger.info("Nest found: %s (model: %s)", cast.name, cast.model_name)
+                return cast
+        except Exception as exc:
+            logger.error("Nest discovery via NEST_IP failed: %s", exc)
+        logger.warning("NEST_IP set but no cast at that host — trying mDNS discovery")
+
+    logger.info("Discovering Google Nest via pychromecast (mDNS)…")
+    browser = None
     try:
-        import pychromecast
         chromecasts, browser = pychromecast.get_chromecasts(timeout=10)
-        browser.stop_discovery()
+        if browser is not None:
+            browser.stop_discovery()
 
         if not chromecasts:
             logger.warning("No Chromecast/Nest devices found on network (EC-002)")
             return None
 
         cast = chromecasts[0]
-
-        # Check if we have a hardcoded IP (OQ-003 — mDNS may be blocked on hackathon WiFi)
-        import os
-        nest_ip = os.getenv("NEST_IP")
-        if nest_ip:
-            logger.info("Using hardcoded NEST_IP=%s", nest_ip)
-            chromecasts_by_ip, browser2 = pychromecast.get_listed_chromecasts(
-                friendly_names=None, uuids=None, known_hosts=[nest_ip]
-            )
-            browser2.stop_discovery()
-            if chromecasts_by_ip:
-                cast = chromecasts_by_ip[0]
-
-        cast.wait()
+        try:
+            cast.wait()
+        except Exception as wait_exc:
+            logger.error("Nest cast.wait() failed: %s", wait_exc)
+            return None
         logger.info("Nest found: %s (model: %s)", cast.name, cast.model_name)
         return cast
 
     except Exception as exc:
         logger.error("Nest discovery error: %s", exc)
+        if browser is not None:
+            try:
+                browser.stop_discovery()
+            except Exception:
+                pass
         return None
 
 
