@@ -1,0 +1,49 @@
+# ScamShield Pi dependencies — pinned for reproducibility
+
+# Audio capture
+PyAudio==0.2.14
+
+# Speech-to-text (local Whisper)
+openai-whisper==20231117
+
+# Gemini API
+google-generativeai==0.7.2
+
+# ElevenLabs TTS
+elevenlabs==1.2.2
+
+# Google Nest / Chromecast
+pychromecast==13.4.0
+
+# Twilio SMS
+twilio==9.2.3
+
+# Grove HAT GPIO
+RPi.GPIO==0.7.1
+# grove.py  # Install separately: pip install grove.py
+
+# Serial (SenseCAP)
+pyserial==3.5
+
+# FastAPI server
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.1
+
+# SQLite async (used by server)
+aiosqlite==0.20.0
+
+# Postgres sync
+psycopg2-binary==2.9.9
+
+# Scheduling (sync worker)
+schedule==1.2.2
+
+# Environment variables
+python-dotenv==1.0.1
+
+# HTTP client (Gemini fallback, health checks)
+httpx==0.27.0
+
+# Logging / utilities
+structlog==24.2.0
