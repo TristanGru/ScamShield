@@ -50,6 +50,9 @@ python-dotenv>=1.2.0
 # HTTP client
 httpx>=0.28.0
 
+# TTS fallback for Nest when ElevenLabs is unavailable
+gtts>=2.5.0
+
 # Logging / utilities
 structlog==24.2.0
 

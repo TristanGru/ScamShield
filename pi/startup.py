@@ -47,10 +47,8 @@ def _generate_warning_audio() -> bool:
         return False
 
     if os.getenv("ELEVENLABS_SKIP_WARNING", "").lower() in ("1", "true", "yes"):
-        logger.warning(
-            "ELEVENLABS_SKIP_WARNING set — skipping ElevenLabs (no warning.mp3; use Nest fallback)"
-        )
-        return False
+        logger.warning("ELEVENLABS_SKIP_WARNING set — skipping ElevenLabs, using gTTS fallback")
+        return _gtts_fallback()
 
     if os.path.exists(WARNING_AUDIO_PATH):
         logger.info("warning.mp3 already cached — skipping generation")
@@ -98,8 +96,21 @@ def _generate_warning_audio() -> bool:
             logger.info("warning.mp3 saved (retry succeeded)")
             return True
         except Exception as retry_exc:
-            logger.error("ElevenLabs retry failed: %s — Nest will use native TTS fallback", retry_exc)
-            return False
+            logger.error("ElevenLabs retry failed: %s — trying gTTS fallback", retry_exc)
+            return _gtts_fallback()
+
+
+def _gtts_fallback() -> bool:
+    """Generate warning.mp3 with gTTS (free, offline-capable) as last resort."""
+    try:
+        from gtts import gTTS
+        tts = gTTS(WARNING_TEXT, lang="en")
+        tts.save(WARNING_AUDIO_PATH)
+        logger.info("gTTS fallback: warning.mp3 saved to %s", WARNING_AUDIO_PATH)
+        return True
+    except Exception as exc:
+        logger.error("gTTS fallback failed: %s — Nest will have no audio", exc)
+        return False
 
 
 def _discover_nest():

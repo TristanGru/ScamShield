@@ -31,6 +31,8 @@ from config import (
     TEXT_ONLY_MODE,
     SKIP_SMS,
     WARNING_AUDIO_PATH,
+    PI_LAN_IP,
+    PI_API_PORT,
 )
 import db
 import hardware
@@ -66,22 +68,47 @@ def set_nest_cast(cast_device) -> None:
 # ── Alert actions (each runs in its own thread) ───────────────────────────────
 
 def _play_nest_warning() -> None:
-    """Play pre-cached ElevenLabs warning.mp3 on Google Nest via pychromecast."""
+    """Stream warning audio to Google Nest via pychromecast.
+
+    Chromecast pulls audio over HTTP — it cannot access local file:// paths.
+    The Pi's FastAPI server serves /warning.mp3 on the LAN.
+    Falls back to gTTS text-to-speech if the MP3 hasn't been generated yet.
+    """
+    import os
+
     if TEXT_ONLY_MODE:
         logger.info(
-            "[Google Nest] (text-only) Would play on speaker:\n  file://%s",
-            WARNING_AUDIO_PATH,
+            "[Google Nest] (text-only) Would stream http://%s:%d/warning.mp3",
+            PI_LAN_IP, PI_API_PORT,
         )
         return
     if _nest_cast is None:
         logger.warning("Nest not connected — skipping Nest audio (EC-002)")
         return
+
+    audio_url = f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3"
+
+    # If warning.mp3 hasn't been generated, create one now with gTTS (free fallback)
+    if not os.path.exists(WARNING_AUDIO_PATH):
+        logger.warning("warning.mp3 missing — generating via gTTS fallback")
+        try:
+            from gtts import gTTS
+            tts = gTTS(
+                "Warning! This may be a scam. Do not share personal info or send money. "
+                "Stay safe and hang up if unsure.",
+                lang="en",
+            )
+            tts.save(WARNING_AUDIO_PATH)
+            logger.info("gTTS fallback saved to %s", WARNING_AUDIO_PATH)
+        except Exception as gtts_exc:
+            logger.error("gTTS fallback failed: %s — no audio for Nest", gtts_exc)
+            return
+
     try:
-        import pychromecast
         mc = _nest_cast.media_controller
-        mc.play_media(f"file://{WARNING_AUDIO_PATH}", "audio/mp3")
-        mc.block_until_active(timeout=5)
-        logger.info("Nest: playing warning audio")
+        mc.play_media(audio_url, "audio/mpeg")
+        mc.block_until_active(timeout=10)
+        logger.info("Nest: streaming %s", audio_url)
     except Exception as exc:
         logger.error("Nest audio playback failed: %s", exc)
 

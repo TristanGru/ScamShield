@@ -4,6 +4,7 @@ Fails fast with a clear error message if any required variable is missing.
 """
 
 import os
+import socket
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -74,6 +75,24 @@ LED_RESET_SECONDS: int = 10
 
 # ── Warning audio cache path ──────────────────────────────────────────────────
 WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
+
+# ── Pi LAN IP (used to build HTTP URL for Chromecast audio streaming) ─────────
+def _detect_lan_ip() -> str:
+    """Return the Pi's LAN IP by routing toward an external host (no packets sent)."""
+    override = os.getenv("PI_LAN_IP", "")
+    if override:
+        return override
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+PI_LAN_IP: str = _detect_lan_ip()
+PI_API_PORT: int = int(_optional("PI_API_PORT", "8000"))
 
 # ── Text-only mode (no ElevenLabs API, Nest/Chromecast, or SenseCAP serial) ───
 # Set SCAMSHIELD_TEXT_ONLY=1 for dev/demo — integrations are logged/printed as plain text.
