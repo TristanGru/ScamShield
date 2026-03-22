@@ -93,6 +93,14 @@ WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
 # JSON sidecar: voice_id + model_id used to build warning.mp3; if env changes, audio is regenerated.
 WARNING_AUDIO_META_PATH: str = str(Path(__file__).parent / "warning.mp3.meta")
 
+# Spoken text for Nest / gTTS (ElevenLabs at startup). Must NOT contain any phrase from
+# SCAM_KEYWORDS in keywords.py — the mic can pick up the speaker and re-trigger detection.
+NEST_WARNING_TEXT: str = (
+    "This is a friendly reminder from your home device. "
+    "For your security, avoid sharing sensitive account information. "
+    "You can disconnect if something feels off."
+)
+
 # ── Pi LAN IP (used to build HTTP URL for Chromecast audio streaming) ─────────
 def _detect_lan_ip() -> str:
     """Return the Pi's LAN IP by routing toward an external host (no packets sent)."""

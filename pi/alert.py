@@ -31,6 +31,7 @@ from config import (
     TEXT_ONLY_MODE,
     SKIP_SMS,
     SKIP_BUZZER,
+    NEST_WARNING_TEXT,
     WARNING_AUDIO_PATH,
     PI_LAN_IP,
     PI_API_PORT,
@@ -116,11 +117,7 @@ def _play_nest_warning() -> None:
         logger.warning("warning.mp3 missing — generating via gTTS fallback")
         try:
             from gtts import gTTS
-            tts = gTTS(
-                "Warning! This may be a scam. Do not share personal info or send money. "
-                "Stay safe and hang up if unsure.",
-                lang="en",
-            )
+            tts = gTTS(NEST_WARNING_TEXT, lang="en")
             tts.save(WARNING_AUDIO_PATH)
             logger.info("gTTS fallback saved to %s", WARNING_AUDIO_PATH)
         except Exception as gtts_exc:

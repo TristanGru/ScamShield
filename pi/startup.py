@@ -23,6 +23,7 @@ from config import (
     ELEVENLABS_MODEL_ID,
     ELEVENLABS_OUTPUT_FORMAT,
     ELEVENLABS_WARNING_VOICE_ID,
+    NEST_WARNING_TEXT,
     NGROK_AUTHTOKEN,
     TEXT_ONLY_MODE,
     WARNING_AUDIO_META_PATH,
@@ -32,12 +33,6 @@ import db
 import sensecap
 
 logger = logging.getLogger(__name__)
-
-WARNING_TEXT = (
-    "Warning! This may be a scam. "
-    "Do not share personal info or send money. "
-    "Stay safe and hang up if unsure."
-)
 
 
 def _mask_voice_id(voice_id: str) -> str:
@@ -116,7 +111,7 @@ def _tts_elevenlabs_rest() -> bool:
         "Accept": "audio/mpeg",
         "Content-Type": "application/json",
     }
-    body = {"text": WARNING_TEXT, "model_id": ELEVENLABS_MODEL_ID}
+    body = {"text": NEST_WARNING_TEXT, "model_id": ELEVENLABS_MODEL_ID}
     logger.info(
         "ElevenLabs REST TTS — voice=%s model=%s",
         _mask_voice_id(vid),
@@ -139,7 +134,7 @@ def _tts_elevenlabs_sdk() -> bool:
     client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
     audio = client.text_to_speech.convert(
         voice_id=ELEVENLABS_WARNING_VOICE_ID,
-        text=WARNING_TEXT,
+        text=NEST_WARNING_TEXT,
         model_id=ELEVENLABS_MODEL_ID,
         output_format=ELEVENLABS_OUTPUT_FORMAT,
     )
@@ -160,7 +155,7 @@ def _gtts_fallback() -> bool:
             "Using gTTS (Google) for warning.mp3 — this is NOT your ElevenLabs voice. "
             "Fix API key/plan/voice_id or remove ELEVENLABS_SKIP_WARNING."
         )
-        tts = gTTS(WARNING_TEXT, lang="en")
+        tts = gTTS(NEST_WARNING_TEXT, lang="en")
         tts.save(WARNING_AUDIO_PATH)
         # No ElevenLabs meta — next boot will try ElevenLabs again if configured
         try:
@@ -187,7 +182,7 @@ def _generate_warning_audio() -> bool:
             WARNING_AUDIO_PATH,
             _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
             ELEVENLABS_MODEL_ID,
-            WARNING_TEXT,
+            NEST_WARNING_TEXT,
         )
         return False
 
