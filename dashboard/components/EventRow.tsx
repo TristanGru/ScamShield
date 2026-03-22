@@ -90,6 +90,7 @@ export default function EventRow({ event, onDeleted }: EventRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   const isAuto = event.trigger_type === "auto";
 
   async function handleDelete() {
@@ -98,6 +99,7 @@ export default function EventRow({ event, onDeleted }: EventRowProps) {
       return;
     }
     setDeleting(true);
+    setDeleteError(false);
     try {
       const res = await fetch(`/api/events/${event.id}`, { method: "DELETE" });
       if (res.ok) {
@@ -105,10 +107,12 @@ export default function EventRow({ event, onDeleted }: EventRowProps) {
       } else {
         setDeleting(false);
         setConfirmDelete(false);
+        setDeleteError(true);
       }
     } catch {
       setDeleting(false);
       setConfirmDelete(false);
+      setDeleteError(true);
     }
   }
 
@@ -294,7 +298,12 @@ export default function EventRow({ event, onDeleted }: EventRowProps) {
             </p>
 
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              {confirmDelete && !deleting && (
+              {deleteError && (
+                <span style={{ fontSize: "12px", color: "var(--color-threat-text)" }}>
+                  Delete failed — is the Pi online?
+                </span>
+              )}
+              {confirmDelete && !deleting && !deleteError && (
                 <span style={{ fontSize: "12px", color: "var(--color-threat-text)" }}>
                   Delete this event?
                 </span>

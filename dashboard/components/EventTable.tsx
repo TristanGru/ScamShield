@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ScamEvent } from "@/lib/api";
 import EventRow from "./EventRow";
 
@@ -63,10 +64,12 @@ function EmptyState() {
 
 export default function EventTable({ events: initialEvents, total, page, limit }: EventTableProps) {
   const [events, setEvents] = useState<ScamEvent[]>(initialEvents);
+  const router = useRouter();
   const totalPages = Math.ceil(total / limit);
 
   function handleDeleted(id: string) {
     setEvents((prev) => prev.filter((e) => e.id !== id));
+    router.refresh(); // re-fetch server data to stay in sync
   }
 
   if (events.length === 0) {
