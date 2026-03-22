@@ -1,8 +1,7 @@
 Tristan:
 1. Only sends out warning every 15 seconds
 2. elevenlabs not working
-3. Make it where you cant just spam a word to increase the score
-4. Make a better way to activate
+3. 
 
 Caleb:
 1. make speech to text better

@@ -30,9 +30,12 @@ from config import (
     LED_RESET_SECONDS,
     TEXT_ONLY_MODE,
     SKIP_SMS,
+    SKIP_BUZZER,
+    NEST_WARNING_TEXT,
     WARNING_AUDIO_PATH,
     PI_LAN_IP,
     PI_API_PORT,
+    ALERT_COOLDOWN_SECONDS,
 )
 import db
 import hardware
@@ -53,6 +56,11 @@ _sms_sent_count = 0
 _last_sms_time: Optional[float] = None
 _sms_lock = threading.Lock()
 
+# Alert cooldown state — prevents repeat Nest/buzzer/SMS during an active scam call.
+_alert_lock = threading.Lock()
+_alert_active: bool = False
+_last_alert_time: float = 0.0
+
 # Nest reference (set by startup.py)
 _nest_cast = None
 _nest_connected = False
@@ -65,17 +73,37 @@ def set_nest_cast(cast_device) -> None:
     _nest_connected = cast_device is not None
 
 
+def is_alert_active() -> bool:
+    """True while the system is in an active-warning state (cooldown not yet cleared)."""
+    with _alert_lock:
+        return _alert_active
+
+
+def clear_alert() -> None:
+    """Reset alert state — called by button press or external API."""
+    global _alert_active
+    with _alert_lock:
+        _alert_active = False
+    set_led_green()
+    sensecap.set_safe()
+    logger.info("Alert cleared — LED green, SenseCAP safe")
+
+
 # ── Alert actions (each runs in its own thread) ───────────────────────────────
 
 def _play_nest_warning() -> None:
-    """Stream warning.mp3 to Nest. Chromecast cannot play file:// — must use HTTP URL."""
+    """Stream warning audio to Google Nest via pychromecast.
+
+    Chromecast pulls audio over HTTP — it cannot access local file:// paths.
+    The Pi's FastAPI server serves /warning.mp3 on the LAN.
+    Falls back to gTTS text-to-speech if the MP3 hasn't been generated yet.
+    """
     import os
 
     if TEXT_ONLY_MODE:
         logger.info(
             "[Google Nest] (text-only) Would stream http://%s:%d/warning.mp3",
-            PI_LAN_IP,
-            PI_API_PORT,
+            PI_LAN_IP, PI_API_PORT,
         )
         return
     if _nest_cast is None:
@@ -83,24 +111,33 @@ def _play_nest_warning() -> None:
         return
 
     audio_url = f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3"
+
+    # If warning.mp3 hasn't been generated, create one now with gTTS (free fallback)
     if not os.path.exists(WARNING_AUDIO_PATH):
-        logger.error(
-            "warning.mp3 missing — cannot play on Nest. "
-            "Fix ElevenLabs / gTTS generation at startup."
-        )
-        return
+        logger.warning("warning.mp3 missing — generating via gTTS fallback")
+        try:
+            from gtts import gTTS
+            tts = gTTS(NEST_WARNING_TEXT, lang="en")
+            tts.save(WARNING_AUDIO_PATH)
+            logger.info("gTTS fallback saved to %s", WARNING_AUDIO_PATH)
+        except Exception as gtts_exc:
+            logger.error("gTTS fallback failed: %s — no audio for Nest", gtts_exc)
+            return
 
     try:
         mc = _nest_cast.media_controller
         mc.play_media(audio_url, "audio/mpeg")
-        mc.block_until_active(timeout=15)
-        logger.info("Nest: streaming %s (same audio as ElevenLabs → warning.mp3)", audio_url)
+        mc.block_until_active(timeout=10)
+        logger.info("Nest: streaming %s", audio_url)
     except Exception as exc:
         logger.error("Nest audio playback failed: %s", exc)
 
 
 def _led_and_buzzer() -> None:
     set_led_red()
+    if SKIP_BUZZER:
+        logger.info("[Buzzer] SCAMSHIELD_SKIP_BUZZER=1 — skipping Grove buzzer")
+        return
     sound_buzzer(duration=2.0)
 
 
@@ -160,8 +197,16 @@ def _send_sms(keywords: list[str], trigger_type: str, transcript: str) -> bool:
 
 
 def _reset_led_after_delay() -> None:
-    """Return LED to green after LED_RESET_SECONDS (FR-020)."""
+    """Return LED to green after LED_RESET_SECONDS (FR-020).
+
+    If the alert is still active (user hasn't pressed button / no cooldown
+    expiry), keep LED red — it will be cleared by clear_alert() instead.
+    """
     time.sleep(LED_RESET_SECONDS)
+    with _alert_lock:
+        if _alert_active:
+            logger.debug("LED reset skipped — alert still active")
+            return
     set_led_green()
     sensecap.set_safe()
 
@@ -177,9 +222,30 @@ def fire_alert(
     """
     Execute the full alert pipeline concurrently.
     trigger_type: 'auto' | 'manual'
+
+    During cooldown (ALERT_COOLDOWN_SECONDS after the last full alert), only
+    the DB write executes — Nest/buzzer/SMS/LED are suppressed.
     """
-    global _alerts_fired
+    global _alerts_fired, _alert_active, _last_alert_time
     _alerts_fired += 1
+
+    with _alert_lock:
+        now = time.time()
+        suppressed = (
+            _alert_active
+            and (now - _last_alert_time) < ALERT_COOLDOWN_SECONDS
+        )
+        if not suppressed:
+            _alert_active = True
+            _last_alert_time = now
+
+    if suppressed:
+        logger.info(
+            "Alert suppressed (cooldown %ds) — DB write only  trigger=%s score=%s",
+            ALERT_COOLDOWN_SECONDS, trigger_type, score,
+        )
+        db.write_event(trigger_type, score, keywords, transcript, False)
+        return
 
     logger.info(
         "ALERT FIRED trigger=%s score=%s keywords=%s",
@@ -227,6 +293,10 @@ def fire_alert(
         # Wait for DB write to get event_id
         event_id = db_future.result(timeout=5)
         sms_sent = sms_future.result(timeout=10)
+        try:
+            led_future.result(timeout=5)
+        except Exception as exc:
+            logger.error("LED/buzzer failed: %s", exc)
 
         # Update SMS status if it was sent
         if sms_sent and event_id:

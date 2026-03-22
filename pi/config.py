@@ -28,14 +28,20 @@ def _optional(key: str, default: str) -> str:
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
+GEMINI_MODEL: str = _optional("GEMINI_MODEL", "gemini-3.1-flash-lite-preview").strip()
 
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
 ELEVENLABS_API_KEY: str = _require("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID: str = _require("ELEVENLABS_VOICE_ID")
-# Optional: voice ID for Nest warning clip only (defaults to ELEVENLABS_VOICE_ID)
+# Premade "Adam" (male) — official catalog voice, not the Voice Library marketplace.
+# Free tier: API allows premade/default voices; *library* / shared marketplace voices return 402.
+ELEVENLABS_DEFAULT_VOICE_ID: str = "pNInz6obpgDQGcFmaJgB"
+_ELEVEN_RAW = os.getenv("ELEVENLABS_VOICE_ID", "").strip()
+ELEVENLABS_VOICE_ID: str = _ELEVEN_RAW if _ELEVEN_RAW else ELEVENLABS_DEFAULT_VOICE_ID
+# Voice for Nest warning only (defaults to ELEVENLABS_VOICE_ID). Strip whitespace — stray spaces break the API.
 _ELEVEN_WARN = os.getenv("ELEVENLABS_WARNING_VOICE_ID", "").strip()
 ELEVENLABS_WARNING_VOICE_ID: str = _ELEVEN_WARN if _ELEVEN_WARN else ELEVENLABS_VOICE_ID
-ELEVENLABS_MODEL_ID: str = _optional("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+ELEVENLABS_MODEL_ID: str = _optional("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2").strip()
+ELEVENLABS_OUTPUT_FORMAT: str = _optional("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128").strip()
 
 # ── Twilio ────────────────────────────────────────────────────────────────────
 TWILIO_ACCOUNT_SID: str = _require("TWILIO_ACCOUNT_SID")
@@ -73,12 +79,45 @@ SENSECAP_BAUD_RATE: int = int(_optional("SENSECAP_BAUD_RATE", "115200"))
 SCAM_SCORE_THRESHOLD: int = int(_optional("SCAM_SCORE_THRESHOLD", "75"))
 SCAM_KEYWORD_MIN_MATCHES: int = int(_optional("SCAM_KEYWORD_MIN_MATCHES", "2"))
 SMS_DEBOUNCE_SECONDS: int = int(_optional("SMS_DEBOUNCE_SECONDS", "60"))
+ALERT_COOLDOWN_SECONDS: int = int(_optional("SCAM_ALERT_COOLDOWN", "30"))
+
+# ── Conversation context (rolling transcript buffer for Gemini) ───────────────
+CONTEXT_CHUNKS: int = int(_optional("SCAM_CONTEXT_CHUNKS", "5"))
+CONTEXT_SILENCE_RESET: int = int(_optional("SCAM_CONTEXT_SILENCE_RESET", "3"))
 
 # ── LED Reset Delay ───────────────────────────────────────────────────────────
 LED_RESET_SECONDS: int = 10
 
 # ── Warning audio cache path ──────────────────────────────────────────────────
 WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
+# JSON sidecar: voice_id + model_id used to build warning.mp3; if env changes, audio is regenerated.
+WARNING_AUDIO_META_PATH: str = str(Path(__file__).parent / "warning.mp3.meta")
+
+# Spoken text for Nest / gTTS (ElevenLabs at startup). Must NOT contain any phrase from
+# SCAM_KEYWORDS in keywords.py — the mic can pick up the speaker and re-trigger detection.
+NEST_WARNING_TEXT: str = (
+    "This is a friendly reminder from your home device. "
+    "For your security, avoid sharing sensitive account information. "
+    "You can disconnect if something feels off."
+)
+
+# ── Pi LAN IP (used to build HTTP URL for Chromecast audio streaming) ─────────
+def _detect_lan_ip() -> str:
+    """Return the Pi's LAN IP by routing toward an external host (no packets sent)."""
+    override = os.getenv("PI_LAN_IP", "")
+    if override:
+        return override
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+PI_LAN_IP: str = _detect_lan_ip()
+PI_API_PORT: int = int(_optional("PI_API_PORT", "8000"))
 
 # ── Pi LAN (Nest streams warning MP3 over HTTP; Chromecast cannot use file://) ─
 def _detect_lan_ip() -> str:
@@ -103,4 +142,5 @@ TEXT_ONLY_MODE: bool = _optional("SCAMSHIELD_TEXT_ONLY", "0").lower() in ("1", "
 
 # ── Testing / dev safety switches ─────────────────────────────────────────────
 SKIP_SMS: bool = _optional("SCAMSHIELD_SKIP_SMS", "0").lower() in ("1", "true", "yes")
+SKIP_BUZZER: bool = _optional("SCAMSHIELD_SKIP_BUZZER", "0").lower() in ("1", "true", "yes")
 SKIP_GEMINI: bool = _optional("SCAMSHIELD_SKIP_GEMINI", "0").lower() in ("1", "true", "yes")

@@ -76,9 +76,9 @@ def health():
 
 @app.get("/warning.mp3")
 def serve_warning_audio():
-    """MP3 served to Chromecast/Nest (must be HTTP — not file://)."""
+    """Serve the cached ElevenLabs warning MP3 to Chromecast/Nest devices."""
     if not os.path.exists(WARNING_AUDIO_PATH):
-        raise HTTPException(status_code=404, detail="warning.mp3 not generated yet")
+        raise HTTPException(status_code=404, detail="warning.mp3 not yet generated")
     return FileResponse(WARNING_AUDIO_PATH, media_type="audio/mpeg")
 
 

@@ -50,7 +50,7 @@ python-dotenv>=1.2.0
 # HTTP client
 httpx>=0.28.0
 
-# Fallback TTS when ElevenLabs fails (402 / skip)
+# TTS fallback for Nest when ElevenLabs is unavailable
 gtts>=2.5.0
 
 # Logging / utilities

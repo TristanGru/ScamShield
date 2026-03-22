@@ -13,6 +13,7 @@ import os
 import queue
 import signal
 import threading
+from collections import deque
 
 import uvicorn
 
@@ -24,6 +25,7 @@ import sync as sync_module
 from audio_capture import AudioCapture
 from hardware import setup_manual_button
 from startup import run_startup
+from config import CONTEXT_CHUNKS, CONTEXT_SILENCE_RESET
 
 import detection
 
@@ -38,20 +40,51 @@ logger = logging.getLogger(__name__)
 
 _shutdown_event = threading.Event()
 
+# Bounded queue between STT worker and detection: when Gemini is slower than Vosk,
+# the STT thread blocks on put() and stops draining chunk_queue → backpressure to capture.
+_TRANSCRIPT_QUEUE_MAX = 10
+
+
+def _stt_pipeline_worker(capture: AudioCapture, transcript_queue: queue.Queue[str]) -> None:
+    """
+    Drain audio chunks from capture.chunk_queue, run Vosk, push plain text downstream.
+
+    Pipelining: while the main thread waits on Gemini for chunk N, this thread can
+    transcribe chunk N+1 so wall-clock work overlaps (STT || Gemini per step).
+    """
+    logger.info("STT pipeline worker started")
+    while not _shutdown_event.is_set():
+        try:
+            wav_bytes = capture.chunk_queue.get(timeout=1.0)
+        except queue.Empty:
+            continue
+        transcript = stt.transcribe(wav_bytes)
+        while not _shutdown_event.is_set():
+            try:
+                transcript_queue.put(transcript, timeout=0.5)
+                break
+            except queue.Full:
+                continue
+    logger.info("STT pipeline worker stopped")
+
 
 def _on_button_press(channel: int) -> None:
-    """Physical button → same alert chain as auto-detection (PRD Phase 1)."""
-    logger.info("Manual button press detected (GPIO %d)", channel)
-    threading.Thread(
-        target=alert.fire_alert,
-        kwargs={
-            "trigger_type": "manual",
-            "score": None,
-            "keywords": [],
-            "transcript": "(Manual trigger by user)",
-        },
-        daemon=True,
-    ).start()
+    """Physical button: clear active alert, or fire manual alert if idle."""
+    logger.info("Button press detected (GPIO %d)", channel)
+    if alert.is_alert_active():
+        alert.clear_alert()
+        logger.info("Alert cleared by button press")
+    else:
+        threading.Thread(
+            target=alert.fire_alert,
+            kwargs={
+                "trigger_type": "manual",
+                "score": None,
+                "keywords": [],
+                "transcript": "(Manual trigger by user)",
+            },
+            daemon=True,
+        ).start()
 
 
 def _start_api_server() -> None:
@@ -67,29 +100,52 @@ def _start_api_server() -> None:
     uvicorn_server.run()
 
 
-def _processing_loop(capture: AudioCapture) -> None:
+def _processing_loop(transcript_queue: queue.Queue[str]) -> None:
     """
-    Main loop: drain chunk_queue → transcribe → score → alert.
+    Main loop: drain transcript queue (filled by STT worker) → score → alert.
+
+    STT runs in a dedicated thread so Vosk can overlap with Gemini/network on
+    the previous chunk.
+
+    A rolling deque keeps the last CONTEXT_CHUNKS transcripts so Gemini
+    sees multi-chunk conversation context.  Keywords are matched against
+    the current chunk only (via current_chunk param) to avoid re-triggering
+    on old text.
     """
-    logger.info("Audio processing loop started")
+    logger.info("Audio processing loop started (STT pipelined)")
     server_module.set_listening(True)
     sensecap.set_listening()
 
+    transcript_buffer: deque[str] = deque(maxlen=CONTEXT_CHUNKS)
+    silence_count = 0
+
     while not _shutdown_event.is_set():
         try:
-            wav_bytes = capture.chunk_queue.get(timeout=1.0)
+            transcript = transcript_queue.get(timeout=1.0)
         except queue.Empty:
             continue
 
-        transcript = stt.transcribe(wav_bytes)
         if not transcript.strip():
+            silence_count += 1
+            if silence_count >= CONTEXT_SILENCE_RESET and transcript_buffer:
+                logger.debug(
+                    "Silence reset (%d empty chunks) — clearing transcript buffer",
+                    silence_count,
+                )
+                transcript_buffer.clear()
             continue
+
+        silence_count = 0
+        transcript_buffer.append(transcript)
 
         logger.debug("Transcript: %s", transcript[:80])
         sensecap.set_transcript(transcript)
 
-        score, keywords = detection.score_transcript(transcript)
-        logger.info("Score=%d keywords=%s", score, keywords)
+        full_context = "\n---\n".join(transcript_buffer)
+        score, keywords = detection.score_transcript(
+            full_context, current_chunk=transcript,
+        )
+        logger.info("Score=%d keywords=%s (buffer=%d chunks)", score, keywords, len(transcript_buffer))
 
         if detection.should_alert(score, keywords):
             alert.fire_alert(
@@ -115,9 +171,9 @@ def main() -> None:
     startup_result = run_startup()
     logger.info("Startup result: %s", startup_result)
 
-    logger.info("Loading Whisper model…")
+    logger.info("Loading Vosk model…")
     stt.load_model()
-    logger.info("Whisper model ready")
+    logger.info("Vosk model ready")
 
     api_thread = threading.Thread(target=_start_api_server, daemon=True, name="api-server")
     api_thread.start()
@@ -128,12 +184,20 @@ def main() -> None:
 
     setup_manual_button(_on_button_press)
 
+    transcript_queue: queue.Queue[str] = queue.Queue(maxsize=_TRANSCRIPT_QUEUE_MAX)
     capture = AudioCapture()
+    stt_thread = threading.Thread(
+        target=_stt_pipeline_worker,
+        args=(capture, transcript_queue),
+        daemon=True,
+        name="stt-pipeline",
+    )
+    stt_thread.start()
     capture.start()
-    logger.info("Audio capture started")
+    logger.info("Audio capture started (STT pipeline worker running)")
 
     try:
-        _processing_loop(capture)
+        _processing_loop(transcript_queue)
     finally:
         capture.stop()
         sensecap.set_ready()
