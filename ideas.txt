@@ -3,11 +3,9 @@ Tristan:
 2. elevenlabs not working
 3. 
 
-
 Caleb:
-
-
-
-
+1. make speech to text better
+2. 
 
 Alex:
+1.
