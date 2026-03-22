@@ -31,7 +31,12 @@ GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
 
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
 ELEVENLABS_API_KEY: str = _require("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID: str = _require("ELEVENLABS_VOICE_ID")
+ELEVENLABS_VOICE_ID: str = _require("ELEVENLABS_VOICE_ID").strip()
+# Voice for Nest warning only (defaults to ELEVENLABS_VOICE_ID). Strip whitespace — stray spaces break the API.
+_ELEVEN_WARN = os.getenv("ELEVENLABS_WARNING_VOICE_ID", "").strip()
+ELEVENLABS_WARNING_VOICE_ID: str = _ELEVEN_WARN if _ELEVEN_WARN else ELEVENLABS_VOICE_ID
+ELEVENLABS_MODEL_ID: str = _optional("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2").strip()
+ELEVENLABS_OUTPUT_FORMAT: str = _optional("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128").strip()
 
 # ── Twilio ────────────────────────────────────────────────────────────────────
 TWILIO_ACCOUNT_SID: str = _require("TWILIO_ACCOUNT_SID")
@@ -75,6 +80,8 @@ LED_RESET_SECONDS: int = 10
 
 # ── Warning audio cache path ──────────────────────────────────────────────────
 WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
+# JSON sidecar: voice_id + model_id used to build warning.mp3; if env changes, audio is regenerated.
+WARNING_AUDIO_META_PATH: str = str(Path(__file__).parent / "warning.mp3.meta")
 
 # ── Pi LAN IP (used to build HTTP URL for Chromecast audio streaming) ─────────
 def _detect_lan_ip() -> str:

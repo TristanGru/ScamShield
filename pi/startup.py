@@ -8,15 +8,23 @@ run_startup() is called once at boot before the main audio loop:
   4. Update FastAPI server status flags
 """
 
+import json
 import logging
 import os
 import time
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import httpx
 
 from config import (
     ELEVENLABS_API_KEY,
-    ELEVENLABS_VOICE_ID,
+    ELEVENLABS_MODEL_ID,
+    ELEVENLABS_OUTPUT_FORMAT,
+    ELEVENLABS_WARNING_VOICE_ID,
     NGROK_AUTHTOKEN,
     TEXT_ONLY_MODE,
+    WARNING_AUDIO_META_PATH,
     WARNING_AUDIO_PATH,
 )
 import db
@@ -31,85 +39,221 @@ WARNING_TEXT = (
 )
 
 
+def _mask_voice_id(voice_id: str) -> str:
+    if len(voice_id) <= 8:
+        return "****"
+    return f"{voice_id[:4]}…{voice_id[-4:]}"
+
+
+def _read_warning_meta() -> Optional[Dict[str, Any]]:
+    try:
+        if not os.path.exists(WARNING_AUDIO_META_PATH):
+            return None
+        with open(WARNING_AUDIO_META_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _write_warning_meta() -> None:
+    payload = {
+        "voice_id": ELEVENLABS_WARNING_VOICE_ID,
+        "model_id": ELEVENLABS_MODEL_ID,
+        "output_format": ELEVENLABS_OUTPUT_FORMAT,
+    }
+    with open(WARNING_AUDIO_META_PATH, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=0)
+
+
+def _invalidate_warning_cache(reason: str) -> None:
+    for path in (WARNING_AUDIO_PATH, WARNING_AUDIO_META_PATH):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                logger.info("Removed %s (%s)", path, reason)
+        except OSError as exc:
+            logger.warning("Could not remove %s: %s", path, exc)
+
+
+def _cache_matches_env() -> bool:
+    if not os.path.exists(WARNING_AUDIO_PATH):
+        return False
+    meta = _read_warning_meta()
+    if not meta:
+        return False
+    return (
+        meta.get("voice_id") == ELEVENLABS_WARNING_VOICE_ID
+        and meta.get("model_id") == ELEVENLABS_MODEL_ID
+        and meta.get("output_format") == ELEVENLABS_OUTPUT_FORMAT
+    )
+
+
+def _tts_elevenlabs_rest() -> bool:
+    """
+    Official REST: POST /v1/text-to-speech/{voice_id} — voice is always in the URL path.
+    More reliable than the Python SDK for honoring the chosen voice.
+    """
+    vid = ELEVENLABS_WARNING_VOICE_ID
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{vid}"
+    params = {"output_format": ELEVENLABS_OUTPUT_FORMAT}
+    headers = {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+    }
+    body = {"text": WARNING_TEXT, "model_id": ELEVENLABS_MODEL_ID}
+    logger.info(
+        "ElevenLabs REST TTS — voice=%s model=%s",
+        _mask_voice_id(vid),
+        ELEVENLABS_MODEL_ID,
+    )
+    with httpx.Client(timeout=120.0) as client:
+        r = client.post(url, params=params, json=body, headers=headers)
+        r.raise_for_status()
+        Path(WARNING_AUDIO_PATH).write_bytes(r.content)
+    _write_warning_meta()
+    logger.info("warning.mp3 saved via REST API → %s", WARNING_AUDIO_PATH)
+    return True
+
+
+def _tts_elevenlabs_sdk() -> bool:
+    """Fallback: Python SDK (some versions mishandle kwargs — REST is preferred)."""
+    from elevenlabs.client import ElevenLabs
+    from elevenlabs.play import save
+
+    client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+    audio = client.text_to_speech.convert(
+        voice_id=ELEVENLABS_WARNING_VOICE_ID,
+        text=WARNING_TEXT,
+        model_id=ELEVENLABS_MODEL_ID,
+        output_format=ELEVENLABS_OUTPUT_FORMAT,
+    )
+    save(audio, WARNING_AUDIO_PATH)
+    _write_warning_meta()
+    logger.info("warning.mp3 saved via Python SDK → %s", WARNING_AUDIO_PATH)
+    return True
+
+
+def _gtts_fallback() -> bool:
+    """
+    Google Translate TTS — sounds like a generic Google voice, NOT ElevenLabs.
+    """
+    try:
+        from gtts import gTTS
+
+        logger.warning(
+            "Using gTTS (Google) for warning.mp3 — this is NOT your ElevenLabs voice. "
+            "Fix API key/plan/voice_id or remove ELEVENLABS_SKIP_WARNING."
+        )
+        tts = gTTS(WARNING_TEXT, lang="en")
+        tts.save(WARNING_AUDIO_PATH)
+        # No ElevenLabs meta — next boot will try ElevenLabs again if configured
+        try:
+            if os.path.exists(WARNING_AUDIO_META_PATH):
+                os.remove(WARNING_AUDIO_META_PATH)
+        except OSError:
+            pass
+        logger.info("gTTS wrote %s", WARNING_AUDIO_PATH)
+        return True
+    except Exception as exc:
+        logger.error("gTTS fallback failed: %s", exc)
+        return False
+
+
 def _generate_warning_audio() -> bool:
     """
     Generate ElevenLabs TTS warning.mp3 and cache it locally.
-    Returns True if successful. Falls back to Nest native TTS on failure (BL-005, EC-011).
+    Uses REST API first so the voice_id in your dashboard matches what you hear on Nest.
     """
     if TEXT_ONLY_MODE:
         logger.info(
             "[ElevenLabs] (text-only) Would synthesize MP3 → %s\n"
-            "Voice ID from env | model eleven_multilingual_v2\n"
-            "Script:\n%s",
+            "voice=%s model=%s\nScript:\n%s",
             WARNING_AUDIO_PATH,
+            _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
+            ELEVENLABS_MODEL_ID,
             WARNING_TEXT,
         )
         return False
 
     if os.getenv("ELEVENLABS_SKIP_WARNING", "").lower() in ("1", "true", "yes"):
-        logger.warning("ELEVENLABS_SKIP_WARNING set — skipping ElevenLabs, using gTTS fallback")
+        _invalidate_warning_cache("ELEVENLABS_SKIP_WARNING")
+        logger.warning("ELEVENLABS_SKIP_WARNING set — using gTTS (not ElevenLabs voice)")
         return _gtts_fallback()
 
-    if os.path.exists(WARNING_AUDIO_PATH):
-        logger.info("warning.mp3 already cached — skipping generation")
-        return True
+    if os.getenv("ELEVENLABS_REGENERATE_WARNING", "").lower() in ("1", "true", "yes"):
+        _invalidate_warning_cache("ELEVENLABS_REGENERATE_WARNING=1")
 
-    logger.info("Generating ElevenLabs warning audio…")
-    try:
-        from elevenlabs.client import ElevenLabs
-        from elevenlabs.play import save
-
-        client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-        audio = client.text_to_speech.convert(
-            text=WARNING_TEXT,
-            voice_id=ELEVENLABS_VOICE_ID,
-            model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128",
+    if os.path.exists(WARNING_AUDIO_PATH) and _cache_matches_env():
+        logger.info(
+            "warning.mp3 cache OK — voice=%s model=%s (delete file or set "
+            "ELEVENLABS_REGENERATE_WARNING=1 to rebuild)",
+            _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
+            ELEVENLABS_MODEL_ID,
         )
-        save(audio, WARNING_AUDIO_PATH)
-        logger.info("warning.mp3 saved to %s", WARNING_AUDIO_PATH)
         return True
 
+    if os.path.exists(WARNING_AUDIO_PATH) and not _cache_matches_env():
+        _invalidate_warning_cache("voice_id/model_id/output_format changed in .env")
+
+    logger.info(
+        "Generating ElevenLabs warning audio (voice=%s model=%s)…",
+        _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
+        ELEVENLABS_MODEL_ID,
+    )
+
+    try:
+        return _tts_elevenlabs_rest()
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code
+        snippet = (exc.response.text or "")[:300]
+        if code == 402:
+            logger.error(
+                "ElevenLabs 402 (payment / plan / voice not allowed on tier). "
+                "Using gTTS — sounds like default Google TTS, NOT ElevenLabs. Body: %s",
+                snippet or exc,
+            )
+            return _gtts_fallback()
+        logger.warning(
+            "ElevenLabs REST HTTP %s — trying Python SDK. Body: %s",
+            code,
+            snippet or exc,
+        )
+        try:
+            return _tts_elevenlabs_sdk()
+        except Exception as sdk_exc:
+            logger.error("ElevenLabs SDK failed: %s — retrying REST after 5s", sdk_exc)
+            time.sleep(5)
+            try:
+                return _tts_elevenlabs_rest()
+            except Exception as rest2:
+                logger.error(
+                    "ElevenLabs still failing after retry (%s) — last-resort gTTS (not ElevenLabs voice)",
+                    rest2,
+                )
+                return _gtts_fallback()
     except Exception as exc:
         err_s = str(exc).lower()
         if "402" in str(exc) or "payment_required" in err_s or "paid_plan" in err_s:
             logger.error(
-                "ElevenLabs blocked (plan/voice) — using gTTS fallback. Details: %s",
+                "ElevenLabs blocked (plan/voice) — %s. Using gTTS (Google voice, not ElevenLabs).",
                 exc,
             )
             return _gtts_fallback()
-        logger.error("ElevenLabs generation failed: %s — retrying once (EC-011)", exc)
-        time.sleep(5)
+        logger.warning("ElevenLabs REST failed (%s) — trying Python SDK", exc)
         try:
-            from elevenlabs.client import ElevenLabs
-            from elevenlabs.play import save
-
-            client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-            audio = client.text_to_speech.convert(
-                text=WARNING_TEXT,
-                voice_id=ELEVENLABS_VOICE_ID,
-                model_id="eleven_multilingual_v2",
-                output_format="mp3_44100_128",
-            )
-            save(audio, WARNING_AUDIO_PATH)
-            logger.info("warning.mp3 saved (retry succeeded)")
-            return True
-        except Exception as retry_exc:
-            logger.error("ElevenLabs retry failed: %s — trying gTTS fallback", retry_exc)
-            return _gtts_fallback()
-
-
-def _gtts_fallback() -> bool:
-    """Generate warning.mp3 with gTTS (free, offline-capable) as last resort."""
-    try:
-        from gtts import gTTS
-        tts = gTTS(WARNING_TEXT, lang="en")
-        tts.save(WARNING_AUDIO_PATH)
-        logger.info("gTTS fallback: warning.mp3 saved to %s", WARNING_AUDIO_PATH)
-        return True
-    except Exception as exc:
-        logger.error("gTTS fallback failed: %s — Nest will have no audio", exc)
-        return False
+            return _tts_elevenlabs_sdk()
+        except Exception as sdk_exc:
+            logger.error("ElevenLabs SDK failed: %s — retrying REST after 5s", sdk_exc)
+            time.sleep(5)
+            try:
+                return _tts_elevenlabs_rest()
+            except Exception as rest2:
+                logger.error(
+                    "ElevenLabs REST retry failed: %s — last-resort gTTS (not ElevenLabs voice)",
+                    rest2,
+                )
+                return _gtts_fallback()
 
 
 def _discover_nest():

@@ -1,0 +1,13 @@
+Tristan:
+1. Only sends out warning every 15 seconds
+2. elevenlabs not working
+3. 
+
+Caleb:
+1. make speech to text better
+2. 
+
+Alex:
+1. Context only considers current frame. Gemini should have a summary of the conversation beforehand to provide better context and reduce false positives.
+2. Warnings only last for a set time. Once detected with high confidence, the user should confirm that it is not a scam before shutting off. 
+3. 
