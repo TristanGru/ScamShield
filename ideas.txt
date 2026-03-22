@@ -8,4 +8,6 @@ Caleb:
 2. 
 
 Alex:
-1.
+1. Context only considers current frame. Gemini should have a summary of the conversation beforehand to provide better context and reduce false positives.
+2. Warnings only last for a set time. Once detected with high confidence, the user should confirm that it is not a scam before shutting off. 
+3. 
