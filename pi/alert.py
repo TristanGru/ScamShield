@@ -214,6 +214,10 @@ def fire_alert(
         # Wait for DB write to get event_id
         event_id = db_future.result(timeout=5)
         sms_sent = sms_future.result(timeout=10)
+        try:
+            led_future.result(timeout=5)
+        except Exception as exc:
+            logger.error("LED/buzzer failed: %s", exc)
 
         # Update SMS status if it was sent
         if sms_sent and event_id:

@@ -85,15 +85,14 @@ def sound_buzzer(duration: float = 2.0) -> None:
         return
     import time
 
+    logger.info("Buzzer: starting on GPIO %d for %.1fs", GPIO_BUZZER_PIN, duration)
     try:
-        pwm = GPIO.PWM(GPIO_BUZZER_PIN, 1000)  # 1 kHz tone — works for passive and active buzzers
-        pwm.start(50)
+        GPIO.output(GPIO_BUZZER_PIN, GPIO.HIGH)
         time.sleep(duration)
-        pwm.stop()
         GPIO.output(GPIO_BUZZER_PIN, GPIO.LOW)
-        logger.debug("Buzzer sounded for %.1fs", duration)
+        logger.info("Buzzer: done")
     except Exception as exc:
-        logger.error("Buzzer failed: %s", exc)
+        logger.error("Buzzer failed (GPIO %d): %s", GPIO_BUZZER_PIN, exc)
 
 
 def set_status_safe() -> None:
