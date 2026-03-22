@@ -69,7 +69,7 @@ def test_play_nest_warning_no_cast(caplog):
 
 
 def test_play_nest_warning_with_cast():
-    """Nest present → media controller called."""
+    """Nest present → synthesize + media controller called."""
     import pi.alert as alert_mod
 
     mock_cast = MagicMock()
@@ -77,7 +77,8 @@ def test_play_nest_warning_with_cast():
     mock_cast.media_controller = mock_mc
     alert_mod._nest_cast = mock_cast
 
-    alert_mod._play_nest_warning()
+    with patch("pi.alert.synthesize_elevenlabs_mp3", return_value=True):
+        alert_mod._play_nest_warning()
 
     mock_mc.play_media.assert_called_once()
     mock_mc.block_until_active.assert_called_once()
@@ -177,7 +178,7 @@ def test_fire_alert_auto(monkeypatch):
 
     calls = []
 
-    monkeypatch.setattr(alert_mod, "_play_nest_warning", lambda: calls.append("nest"))
+    monkeypatch.setattr(alert_mod, "_play_nest_warning", lambda *a, **kw: calls.append("nest"))
     monkeypatch.setattr(alert_mod, "_led_and_buzzer", lambda: calls.append("led"))
     monkeypatch.setattr(alert_mod, "_send_sms", lambda *a, **kw: calls.append("sms") or True)
     monkeypatch.setattr(alert_mod, "_reset_led_after_delay", lambda: None)
@@ -204,7 +205,7 @@ def test_fire_alert_manual(monkeypatch):
     import pi.alert as alert_mod
     _reset_alert_module()
 
-    monkeypatch.setattr(alert_mod, "_play_nest_warning", lambda: None)
+    monkeypatch.setattr(alert_mod, "_play_nest_warning", lambda *a, **kw: None)
     monkeypatch.setattr(alert_mod, "_led_and_buzzer", lambda: None)
     monkeypatch.setattr(alert_mod, "_send_sms", lambda *a, **kw: True)
     monkeypatch.setattr(alert_mod, "_reset_led_after_delay", lambda: None)
@@ -229,7 +230,7 @@ def test_fire_alert_nest_failure_doesnt_block(monkeypatch):
 
     sms_called = []
 
-    def _bad_nest():
+    def _bad_nest(*_a, **_kw):
         raise RuntimeError("Nest exploded")
 
     monkeypatch.setattr(alert_mod, "_play_nest_warning", _bad_nest)

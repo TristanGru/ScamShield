@@ -19,6 +19,7 @@ try:
     from pi.config import (
         GEMINI_API_KEY,
         GEMINI_MODEL,
+        NEST_WARNING_TEXT,
         SCAM_SCORE_THRESHOLD,
         SCAM_KEYWORD_MIN_MATCHES,
         SKIP_GEMINI,
@@ -28,6 +29,7 @@ except ImportError:
     from config import (
         GEMINI_API_KEY,
         GEMINI_MODEL,
+        NEST_WARNING_TEXT,
         SCAM_SCORE_THRESHOLD,
         SCAM_KEYWORD_MIN_MATCHES,
         SKIP_GEMINI,
@@ -79,6 +81,19 @@ Examples:
 {"score": 35, "reason": "caller claims to be from Medicare but no demand yet"}
 {"score": 82, "reason": "IRS impersonation with gift card payment demand"}
 """
+
+_NEST_VOICE_SCRIPT_PROMPT = """You write short lines for a smart speaker to read aloud to an elderly person who may be on a risky phone call.
+
+You receive:
+1) Recent call transcript (speech-to-text segments separated by ---; text may be garbled).
+2) A risk score 0-100 and a one-line analyst note.
+
+Write 2–4 sentences (at most 70 words) for the speaker to read aloud. Tone: calm, protective, clear.
+- Summarize the situation in general terms (e.g. unexpected requests, pressure to act fast) without repeating scammer tactics, exact threats, or sensitive personal data from the transcript.
+- Do NOT use wording that sounds like common fraud scripts (demands for payments, gift cards, wire transfers, cryptocurrency, government threats, "stay on the line", urgent payment, etc.).
+- Prefer neutral safety language: protect private details, end the call if uncomfortable, verify with a trusted person.
+
+Output ONLY the spoken words. No title, no quotes, no JSON, no bullet points."""
 
 
 def _get_client() -> genai.Client:
@@ -205,6 +220,64 @@ def should_alert(score: int, keywords: list[str]) -> bool:
 def should_alert_analysis(analysis: ScamAnalysis) -> bool:
     """Same as should_alert but takes a ScamAnalysis."""
     return should_alert(analysis.score, analysis.matched_keywords)
+
+
+def generate_nest_voice_script(
+    conversation_context: str,
+    score: Optional[int],
+    reason: str,
+    trigger_type: str,
+) -> str:
+    """
+    Ask Gemini for spoken Nest audio text from conversation context + score/reason.
+    Falls back to NEST_WARNING_TEXT if Gemini is off, manual test without context, or on error.
+    Sanitizes against SCAM_KEYWORDS so the mic does not re-trigger.
+    """
+    safe_default = NEST_WARNING_TEXT.strip()
+
+    if SKIP_GEMINI:
+        logger.debug("[Gemini] SCAMSHIELD_SKIP_GEMINI=1 — using default Nest script")
+        return safe_default
+
+    if trigger_type == "manual" and not (conversation_context or "").strip():
+        return safe_default
+
+    ctx = (conversation_context or "").strip()
+    if not ctx:
+        return safe_default
+
+    try:
+        client = _get_client()
+        score_s = str(score) if score is not None else "unknown"
+        user = (
+            f"Transcript:\n{ctx}\n\n"
+            f"Risk score: {score_s}\nAnalyst note: {reason or 'none'}\n"
+        )
+        prompt = f"{_NEST_VOICE_SCRIPT_PROMPT}\n\n{user}"
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+        )
+        raw = (response.text or "").strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"```(?:\w*)?\s*", "", raw).strip("` \n")
+        script = raw.split("\n\n")[0].strip()
+        if len(script) > 1200:
+            script = script[:1200].rsplit(" ", 1)[0] + "…"
+        if not script:
+            return safe_default
+        bad = _keyword_match(script)
+        if bad:
+            logger.warning(
+                "Nest script matched detector keywords %s — using default safe text",
+                bad[:8],
+            )
+            return safe_default
+        logger.info("Nest voice script (%d chars): %s…", len(script), script[:80])
+        return script
+    except Exception as exc:
+        logger.warning("Gemini nest script failed (%s) — default text", exc)
+        return safe_default
 
 
 def get_metrics() -> dict:

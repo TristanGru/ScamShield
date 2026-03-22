@@ -123,6 +123,13 @@ PI_API_PORT: int = int(_optional("PI_API_PORT", "8000"))
 # Set SCAMSHIELD_TEXT_ONLY=1 for dev/demo — integrations are logged/printed as plain text.
 TEXT_ONLY_MODE: bool = _optional("SCAMSHIELD_TEXT_ONLY", "0").lower() in ("1", "true", "yes")
 
+# ── Nest voice: Gemini-written script per alert + ElevenLabs (vs static NEST_WARNING_TEXT) ─
+DYNAMIC_NEST_VOICE: bool = _optional("SCAM_DYNAMIC_NEST_VOICE", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # ── Testing / dev safety switches ─────────────────────────────────────────────
 SKIP_SMS: bool = _optional("SCAMSHIELD_SKIP_SMS", "0").lower() in ("1", "true", "yes")
 SKIP_BUZZER: bool = _optional("SCAMSHIELD_SKIP_BUZZER", "0").lower() in ("1", "true", "yes")

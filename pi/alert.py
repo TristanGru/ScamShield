@@ -1,8 +1,8 @@
 """
 alert.py — Alert pipeline for ScamShield.
 
-fire_alert(trigger_type, score, keywords, transcript) executes concurrently:
-  1. Google Nest: play ElevenLabs warning.mp3 via pychromecast
+fire_alert(...) executes concurrently:
+  1. Google Nest: Gemini-written script (optional) → ElevenLabs MP3 → Chromecast stream
   2. Grove LED: turn red
   3. Grove Buzzer: sound for 2 seconds
   4. Twilio: send SMS to family member (with debounce)
@@ -15,6 +15,7 @@ All external calls are individually try/except — one failure never blocks othe
 """
 
 import logging
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -31,6 +32,7 @@ from config import (
     TEXT_ONLY_MODE,
     SKIP_SMS,
     SKIP_BUZZER,
+    DYNAMIC_NEST_VOICE,
     NEST_WARNING_TEXT,
     WARNING_AUDIO_PATH,
     PI_LAN_IP,
@@ -38,8 +40,10 @@ from config import (
     ALERT_COOLDOWN_SECONDS,
 )
 import db
+import detection
 import hardware
 import sensecap
+from elevenlabs_tts import gtts_write_mp3, synthesize_elevenlabs_mp3
 
 # Re-export for tests and callers that patch LED helpers
 set_led_red = hardware.set_led_red
@@ -91,43 +95,49 @@ def clear_alert() -> None:
 
 # ── Alert actions (each runs in its own thread) ───────────────────────────────
 
-def _play_nest_warning() -> None:
-    """Stream warning audio to Google Nest via pychromecast.
-
-    Chromecast pulls audio over HTTP — it cannot access local file:// paths.
-    The Pi's FastAPI server serves /warning.mp3 on the LAN.
-    Falls back to gTTS text-to-speech if the MP3 hasn't been generated yet.
-    """
-    import os
-
+def _play_nest_warning(
+    conversation_context: str = "",
+    reason: str = "none",
+    score: Optional[int] = None,
+    trigger_type: str = "auto",
+) -> None:
+    """Gemini script (optional) + ElevenLabs or gTTS, then stream warning.mp3 to Nest."""
     if TEXT_ONLY_MODE:
+        mode = "dynamic Gemini + ElevenLabs" if DYNAMIC_NEST_VOICE else "static NEST_WARNING_TEXT"
         logger.info(
-            "[Google Nest] (text-only) Would stream http://%s:%d/warning.mp3",
-            PI_LAN_IP, PI_API_PORT,
+            "[Google Nest] (text-only) Would stream http://%s:%d/warning.mp3 (%s)",
+            PI_LAN_IP,
+            PI_API_PORT,
+            mode,
         )
         return
     if _nest_cast is None:
         logger.warning("Nest not connected — skipping Nest audio (EC-002)")
         return
 
-    audio_url = f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3"
+    if DYNAMIC_NEST_VOICE:
+        script = detection.generate_nest_voice_script(
+            conversation_context, score, reason, trigger_type,
+        )
+    else:
+        script = NEST_WARNING_TEXT.strip()
 
-    # If warning.mp3 hasn't been generated, create one now with gTTS (free fallback)
-    if not os.path.exists(WARNING_AUDIO_PATH):
-        logger.warning("warning.mp3 missing — generating via gTTS fallback")
-        try:
-            from gtts import gTTS
-            tts = gTTS(NEST_WARNING_TEXT, lang="en")
-            tts.save(WARNING_AUDIO_PATH)
-            logger.info("gTTS fallback saved to %s", WARNING_AUDIO_PATH)
-        except Exception as gtts_exc:
-            logger.error("gTTS fallback failed: %s — no audio for Nest", gtts_exc)
+    skip_el = os.getenv("ELEVENLABS_SKIP_WARNING", "").lower() in ("1", "true", "yes")
+    if skip_el:
+        logger.info("ELEVENLABS_SKIP_WARNING=1 — gTTS for this alert")
+        if not gtts_write_mp3(script, WARNING_AUDIO_PATH):
             return
+    else:
+        if not synthesize_elevenlabs_mp3(script, WARNING_AUDIO_PATH):
+            logger.warning("ElevenLabs failed for alert — gTTS fallback")
+            if not gtts_write_mp3(script, WARNING_AUDIO_PATH):
+                return
 
+    audio_url = f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3"
     try:
         mc = _nest_cast.media_controller
         mc.play_media(audio_url, "audio/mpeg")
-        mc.block_until_active(timeout=10)
+        mc.block_until_active(timeout=15)
         logger.info("Nest: streaming %s", audio_url)
     except Exception as exc:
         logger.error("Nest audio playback failed: %s", exc)
@@ -218,10 +228,15 @@ def fire_alert(
     score: Optional[int],
     keywords: list[str],
     transcript: str,
+    conversation_context: str = "",
+    reason: str = "none",
 ) -> None:
     """
     Execute the full alert pipeline concurrently.
     trigger_type: 'auto' | 'manual'
+
+    conversation_context: rolling transcript (--- joined) for Gemini Nest script.
+    reason: analyst reason from detection (or "manual").
 
     During cooldown (ALERT_COOLDOWN_SECONDS after the last full alert), only
     the DB write executes — Nest/buzzer/SMS/LED are suppressed.
@@ -266,8 +281,8 @@ def fire_alert(
             f"  Keywords:     {keywords_str}\n"
             f"  Transcript:   {transcript[:400]}{'…' if len(transcript) > 400 else ''}\n"
             f"{'─' * 52}\n"
-            f"  [ElevenLabs] Already described at startup (warning MP3 script).\n"
-            f"  [Google Nest] Would play: file://{WARNING_AUDIO_PATH}\n"
+            f"  [Nest audio] Dynamic script + ElevenLabs if SCAM_DYNAMIC_NEST_VOICE=1.\n"
+            f"  [Google Nest] Would stream: http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3\n"
             f"  [SenseCAP] Would show STATUS: !!! SCAM DETECTED !!! + transcript line.\n"
             f"{'═' * 52}\n"
         )
@@ -278,7 +293,13 @@ def fire_alert(
 
     # Run all alert actions concurrently
     with ThreadPoolExecutor(max_workers=4, thread_name_prefix="alert") as executor:
-        nest_future = executor.submit(_play_nest_warning)
+        nest_future = executor.submit(
+            _play_nest_warning,
+            conversation_context,
+            reason,
+            score,
+            trigger_type,
+        )
         led_future = executor.submit(_led_and_buzzer)
         sms_future = executor.submit(_send_sms, keywords, trigger_type, transcript)
         db_future = executor.submit(
@@ -297,6 +318,10 @@ def fire_alert(
             led_future.result(timeout=5)
         except Exception as exc:
             logger.error("LED/buzzer failed: %s", exc)
+        try:
+            nest_future.result(timeout=120)
+        except Exception as exc:
+            logger.error("Nest playback failed: %s", exc)
 
         # Update SMS status if it was sent
         if sms_sent and event_id:

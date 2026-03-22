@@ -8,6 +8,7 @@ try:
     from .scam_detector import (  # type: ignore
         ScamAnalysis,
         analyze_transcript,
+        generate_nest_voice_script,
         get_metrics,
         score_transcript,
         should_alert,
@@ -19,6 +20,7 @@ except ImportError:
     from scam_detector import (  # type: ignore
         ScamAnalysis,
         analyze_transcript,
+        generate_nest_voice_script,
         get_metrics,
         score_transcript,
         should_alert,

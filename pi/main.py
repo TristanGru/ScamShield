@@ -82,6 +82,8 @@ def _on_button_press(channel: int) -> None:
                 "score": None,
                 "keywords": [],
                 "transcript": "(Manual trigger by user)",
+                "conversation_context": "",
+                "reason": "manual",
             },
             daemon=True,
         ).start()
@@ -142,17 +144,24 @@ def _processing_loop(transcript_queue: queue.Queue[str]) -> None:
         sensecap.set_transcript(transcript)
 
         full_context = "\n---\n".join(transcript_buffer)
-        score, keywords = detection.score_transcript(
+        analysis = detection.analyze_transcript(
             full_context, current_chunk=transcript,
         )
-        logger.info("Score=%d keywords=%s (buffer=%d chunks)", score, keywords, len(transcript_buffer))
+        logger.info(
+            "Score=%d keywords=%s (buffer=%d chunks)",
+            analysis.score,
+            analysis.matched_keywords,
+            len(transcript_buffer),
+        )
 
-        if detection.should_alert(score, keywords):
+        if detection.should_alert(analysis.score, analysis.matched_keywords):
             alert.fire_alert(
                 trigger_type="auto",
-                score=score,
-                keywords=keywords,
+                score=analysis.score,
+                keywords=analysis.matched_keywords,
                 transcript=transcript,
+                conversation_context=full_context,
+                reason=analysis.reason or "none",
             )
 
     server_module.set_listening(False)
