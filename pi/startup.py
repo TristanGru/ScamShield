@@ -13,12 +13,13 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 
 from config import (
     ELEVENLABS_API_KEY,
+    ELEVENLABS_DEFAULT_VOICE_ID,
     ELEVENLABS_MODEL_ID,
     ELEVENLABS_OUTPUT_FORMAT,
     ELEVENLABS_WARNING_VOICE_ID,
@@ -43,6 +44,20 @@ def _mask_voice_id(voice_id: str) -> str:
     if len(voice_id) <= 8:
         return "****"
     return f"{voice_id[:4]}…{voice_id[-4:]}"
+
+
+def _elevenlabs_api_error_message(response_text: str) -> Tuple[Optional[str], Optional[str]]:
+    """Parse ElevenLabs JSON error body; return (human message, error code)."""
+    try:
+        data = json.loads(response_text)
+        detail = data.get("detail")
+        if isinstance(detail, dict):
+            return detail.get("message"), detail.get("code")
+        if isinstance(detail, str):
+            return detail, None
+    except Exception:
+        pass
+    return None, None
 
 
 def _read_warning_meta() -> Optional[Dict[str, Any]]:
@@ -196,6 +211,14 @@ def _generate_warning_audio() -> bool:
     if os.path.exists(WARNING_AUDIO_PATH) and not _cache_matches_env():
         _invalidate_warning_cache("voice_id/model_id/output_format changed in .env")
 
+    if not os.getenv("ELEVENLABS_VOICE_ID", "").strip() and not os.getenv(
+        "ELEVENLABS_WARNING_VOICE_ID", ""
+    ).strip():
+        logger.info(
+            "ElevenLabs voice env unset — using default premade Adam male (%s), free-tier API friendly",
+            _mask_voice_id(ELEVENLABS_DEFAULT_VOICE_ID),
+        )
+
     logger.info(
         "Generating ElevenLabs warning audio (voice=%s model=%s)…",
         _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
@@ -206,18 +229,26 @@ def _generate_warning_audio() -> bool:
         return _tts_elevenlabs_rest()
     except httpx.HTTPStatusError as exc:
         code = exc.response.status_code
-        snippet = (exc.response.text or "")[:300]
+        body = exc.response.text or ""
+        snippet = body[:500]
+        api_msg, api_code = _elevenlabs_api_error_message(body)
         if code == 402:
             logger.error(
-                "ElevenLabs 402 (payment / plan / voice not allowed on tier). "
-                "Using gTTS — sounds like default Google TTS, NOT ElevenLabs. Body: %s",
+                "ElevenLabs 402 — %s [code=%s]. "
+                "On the free tier, library / default catalog voices often cannot be used via the API "
+                "(paid_plan_required). Options: (1) upgrade ElevenLabs, or (2) set ELEVENLABS_VOICE_ID "
+                "to a voice your plan allows in the API (e.g. an Instant Voice Clone you own), then "
+                "delete warning.mp3 + warning.mp3.meta or set ELEVENLABS_REGENERATE_WARNING=1. "
+                "Falling back to gTTS (Google voice, NOT ElevenLabs). Raw: %s",
+                api_msg or "payment required",
+                api_code or "?",
                 snippet or exc,
             )
             return _gtts_fallback()
         logger.warning(
             "ElevenLabs REST HTTP %s — trying Python SDK. Body: %s",
             code,
-            snippet or exc,
+            (api_msg or snippet or exc),
         )
         try:
             return _tts_elevenlabs_sdk()
@@ -283,11 +314,23 @@ def _discover_nest():
     nest_ip = os.getenv("NEST_IP")
     DISCOVERY_TIMEOUT = 15
 
+    def _cast_label(cast) -> str:
+        if getattr(cast, "name", None):
+            return cast.name
+        ci = getattr(cast, "cast_info", None)
+        if ci is not None and getattr(ci, "friendly_name", None):
+            return ci.friendly_name
+        return getattr(cast, "host", None) or "Chromecast"
+
     def _try_connect(cast):
         """Wait for the cast socket to connect; return cast or None."""
         try:
             cast.wait(timeout=10)
-            logger.info("Nest found: %s (model: %s)", cast.name, cast.model_name)
+            logger.info(
+                "Nest found: %s (model: %s)",
+                _cast_label(cast),
+                cast.model_name or "?",
+            )
             return cast
         except Exception as exc:
             logger.error("Nest cast.wait() failed: %s", exc)

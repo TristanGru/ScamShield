@@ -220,7 +220,7 @@ Copy `pi/.env.example` to `pi/.env` and fill in:
 |----------|-------------|
 | `GEMINI_API_KEY` | Google Gemini API key |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key |
-| `ELEVENLABS_VOICE_ID` | Voice ID for warning audio |
+| `ELEVENLABS_VOICE_ID` | Optional. Defaults to premade **Adam** (male, `pNInz6obpgDQGcFmaJgB`), which works on the **free** API tier. Voice Library IDs need a paid plan. |
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token |
 | `TWILIO_FROM_NUMBER` | Twilio phone number |

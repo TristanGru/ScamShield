@@ -31,7 +31,11 @@ GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
 
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
 ELEVENLABS_API_KEY: str = _require("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID: str = _require("ELEVENLABS_VOICE_ID").strip()
+# Premade "Adam" (male) — official catalog voice, not the Voice Library marketplace.
+# Free tier: API allows premade/default voices; *library* / shared marketplace voices return 402.
+ELEVENLABS_DEFAULT_VOICE_ID: str = "pNInz6obpgDQGcFmaJgB"
+_ELEVEN_RAW = os.getenv("ELEVENLABS_VOICE_ID", "").strip()
+ELEVENLABS_VOICE_ID: str = _ELEVEN_RAW if _ELEVEN_RAW else ELEVENLABS_DEFAULT_VOICE_ID
 # Voice for Nest warning only (defaults to ELEVENLABS_VOICE_ID). Strip whitespace — stray spaces break the API.
 _ELEVEN_WARN = os.getenv("ELEVENLABS_WARNING_VOICE_ID", "").strip()
 ELEVENLABS_WARNING_VOICE_ID: str = _ELEVEN_WARN if _ELEVEN_WARN else ELEVENLABS_VOICE_ID
