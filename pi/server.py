@@ -33,7 +33,7 @@ app = FastAPI(title="ScamShield Pi API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Restricted to server-side Next.js calls in production
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -118,6 +118,14 @@ def create_event(payload: EventCreate):
     if not events:
         raise HTTPException(status_code=500, detail="Event write failed")
     return events[0]
+
+
+@app.delete("/events/{event_id}", status_code=200)
+def delete_event(event_id: str):
+    deleted = db.delete_event(event_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"deleted": event_id}
 
 
 @app.get("/metrics")

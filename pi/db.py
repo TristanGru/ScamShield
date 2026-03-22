@@ -141,6 +141,16 @@ def get_unsynced_events() -> list[dict]:
     return events
 
 
+def delete_event(event_id: str) -> bool:
+    """Delete an event by ID. Returns True if a row was deleted."""
+    with _get_connection() as conn:
+        cursor = conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    deleted = cursor.rowcount > 0
+    if deleted:
+        logger.info("Event deleted: %s", event_id)
+    return deleted
+
+
 def mark_synced(event_ids: list[str]) -> None:
     """Mark events as synced to Postgres."""
     if not event_ids:

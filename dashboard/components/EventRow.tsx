@@ -83,11 +83,34 @@ function Chevron({ open }: { open: boolean }) {
 
 interface EventRowProps {
   event: ScamEvent;
+  onDeleted?: (id: string) => void;
 }
 
-export default function EventRow({ event }: EventRowProps) {
+export default function EventRow({ event, onDeleted }: EventRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const isAuto = event.trigger_type === "auto";
+
+  async function handleDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/events/${event.id}`, { method: "DELETE" });
+      if (res.ok) {
+        onDeleted?.(event.id);
+      } else {
+        setDeleting(false);
+        setConfirmDelete(false);
+      }
+    } catch {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   return (
     <div style={{ borderBottom: "1px solid var(--color-line-subtle)" }} className="last:border-b-0">
@@ -250,16 +273,68 @@ export default function EventRow({ event }: EventRowProps) {
           >
             {event.transcript || "No transcript was captured for this event."}
           </p>
-          <p
+          <div
             style={{
-              marginTop: "16px",
-              fontSize: "11px",
-              color: "var(--color-ink-muted)",
-              fontFamily: "ui-monospace, monospace",
+              marginTop: "20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "12px",
             }}
           >
-            ID: {event.id}
-          </p>
+            <p
+              style={{
+                fontSize: "11px",
+                color: "var(--color-ink-muted)",
+                fontFamily: "ui-monospace, monospace",
+              }}
+            >
+              ID: {event.id}
+            </p>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {confirmDelete && !deleting && (
+                <span style={{ fontSize: "12px", color: "var(--color-threat-text)" }}>
+                  Delete this event?
+                </span>
+              )}
+              {confirmDelete && !deleting && (
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--color-ink-muted)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                aria-label={confirmDelete ? "Confirm delete event" : "Delete event"}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  color: confirmDelete ? "var(--color-threat-text)" : "var(--color-ink-muted)",
+                  background: "none",
+                  border: confirmDelete ? "1px solid var(--color-threat-text)" : "1px solid var(--color-line-subtle)",
+                  borderRadius: "2px",
+                  cursor: deleting ? "not-allowed" : "pointer",
+                  padding: "4px 10px",
+                  opacity: deleting ? 0.5 : 1,
+                  transition: "all 150ms ease",
+                }}
+              >
+                {deleting ? "Deleting…" : confirmDelete ? "Confirm" : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

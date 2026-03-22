@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { ScamEvent } from "@/lib/api";
 import EventRow from "./EventRow";
 
@@ -58,8 +61,13 @@ function EmptyState() {
   );
 }
 
-export default function EventTable({ events, total, page, limit }: EventTableProps) {
+export default function EventTable({ events: initialEvents, total, page, limit }: EventTableProps) {
+  const [events, setEvents] = useState<ScamEvent[]>(initialEvents);
   const totalPages = Math.ceil(total / limit);
+
+  function handleDeleted(id: string) {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  }
 
   if (events.length === 0) {
     return <EmptyState />;
@@ -89,7 +97,7 @@ export default function EventTable({ events, total, page, limit }: EventTablePro
       {/* ── Event rows ────────────────────────────────────────────── */}
       <div>
         {events.map((event) => (
-          <EventRow key={event.id} event={event} />
+          <EventRow key={event.id} event={event} onDeleted={handleDeleted} />
         ))}
       </div>
 
