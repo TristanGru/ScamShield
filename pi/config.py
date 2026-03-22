@@ -111,4 +111,5 @@ TEXT_ONLY_MODE: bool = _optional("SCAMSHIELD_TEXT_ONLY", "0").lower() in ("1", "
 
 # ── Testing / dev safety switches ─────────────────────────────────────────────
 SKIP_SMS: bool = _optional("SCAMSHIELD_SKIP_SMS", "0").lower() in ("1", "true", "yes")
+SKIP_BUZZER: bool = _optional("SCAMSHIELD_SKIP_BUZZER", "0").lower() in ("1", "true", "yes")
 SKIP_GEMINI: bool = _optional("SCAMSHIELD_SKIP_GEMINI", "0").lower() in ("1", "true", "yes")

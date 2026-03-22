@@ -30,6 +30,7 @@ from config import (
     LED_RESET_SECONDS,
     TEXT_ONLY_MODE,
     SKIP_SMS,
+    SKIP_BUZZER,
     WARNING_AUDIO_PATH,
     PI_LAN_IP,
     PI_API_PORT,
@@ -115,6 +116,9 @@ def _play_nest_warning() -> None:
 
 def _led_and_buzzer() -> None:
     set_led_red()
+    if SKIP_BUZZER:
+        logger.info("[Buzzer] SCAMSHIELD_SKIP_BUZZER=1 — skipping Grove buzzer")
+        return
     sound_buzzer(duration=2.0)
 
 
