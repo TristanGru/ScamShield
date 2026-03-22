@@ -96,7 +96,7 @@ def _send_sms(keywords: list[str], trigger_type: str, transcript: str) -> bool:
     global _last_sms_time, _sms_sent_count
 
     if SKIP_SMS:
-        logger.info("[SMS] SCAMSHIELD_SKIP_SMS=1 — skipping Twilio (trigger=%s score=%s)", trigger_type, score)
+        logger.info("[SMS] SCAMSHIELD_SKIP_SMS=1 — skipping Twilio (trigger=%s)", trigger_type)
         return False
 
     with _sms_lock:
