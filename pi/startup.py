@@ -74,11 +74,10 @@ def _generate_warning_audio() -> bool:
         err_s = str(exc).lower()
         if "402" in str(exc) or "payment_required" in err_s or "paid_plan" in err_s:
             logger.error(
-                "ElevenLabs blocked (plan/voice) — set ELEVENLABS_SKIP_WARNING=1 or change "
-                "ELEVENLABS_VOICE_ID; Nest will use fallback. Details: %s",
+                "ElevenLabs blocked (plan/voice) — using gTTS fallback. Details: %s",
                 exc,
             )
-            return False
+            return _gtts_fallback()
         logger.error("ElevenLabs generation failed: %s — retrying once (EC-011)", exc)
         time.sleep(5)
         try:
@@ -134,60 +133,70 @@ def _discover_nest():
         return None
 
     import pychromecast
+    from pychromecast import CastBrowser, SimpleCastListener
+    import zeroconf as zc
 
     nest_ip = os.getenv("NEST_IP")
+    DISCOVERY_TIMEOUT = 15
 
-    # Prefer direct IP when set — fewer zeroconf/mDNS edge cases on some networks (RPi)
-    if nest_ip:
-        logger.info("Discovering Nest via NEST_IP=%s …", nest_ip)
-        browser2 = None
+    def _try_connect(cast):
+        """Wait for the cast socket to connect; return cast or None."""
         try:
-            chromecasts_by_ip, browser2 = pychromecast.get_listed_chromecasts(
-                friendly_names=None, uuids=None, known_hosts=[nest_ip]
-            )
-            if browser2 is not None:
-                browser2.stop_discovery()
-            if chromecasts_by_ip:
-                cast = chromecasts_by_ip[0]
-                try:
-                    cast.wait()
-                except Exception as wait_exc:
-                    logger.error("Nest cast.wait() failed: %s", wait_exc)
-                    return None
-                logger.info("Nest found: %s (model: %s)", cast.name, cast.model_name)
-                return cast
+            cast.wait(timeout=10)
+            logger.info("Nest found: %s (model: %s)", cast.name, cast.model_name)
+            return cast
         except Exception as exc:
-            logger.error("Nest discovery via NEST_IP failed: %s", exc)
-        logger.warning("NEST_IP set but no cast at that host — trying mDNS discovery")
+            logger.error("Nest cast.wait() failed: %s", exc)
+            return None
 
-    logger.info("Discovering Google Nest via pychromecast (mDNS)…")
+    # --- Direct IP (preferred when NEST_IP is set) ---
+    if nest_ip:
+        logger.info("Connecting to Nest at NEST_IP=%s …", nest_ip)
+        try:
+            cast = pychromecast.get_chromecast_from_host(
+                (nest_ip, 8009, None, None, None)
+            )
+            result = _try_connect(cast)
+            if result:
+                return result
+        except Exception as exc:
+            logger.warning("NEST_IP direct connect failed: %s — trying mDNS", exc)
+
+    # --- mDNS discovery via CastBrowser (replaces deprecated get_chromecasts) ---
+    logger.info("Discovering Google Nest via mDNS…")
+    zconf = None
     browser = None
     try:
-        chromecasts, browser = pychromecast.get_chromecasts(timeout=10)
-        if browser is not None:
-            browser.stop_discovery()
+        zconf = zc.Zeroconf()
+        listener = SimpleCastListener()
+        browser = CastBrowser(listener, zconf)
+        browser.start_discovery()
+        time.sleep(DISCOVERY_TIMEOUT)
+        browser.stop_discovery()
 
-        if not chromecasts:
+        services = listener.services
+        if not services:
             logger.warning("No Chromecast/Nest devices found on network (EC-002)")
             return None
 
-        cast = chromecasts[0]
-        try:
-            cast.wait()
-        except Exception as wait_exc:
-            logger.error("Nest cast.wait() failed: %s", wait_exc)
-            return None
-        logger.info("Nest found: %s (model: %s)", cast.name, cast.model_name)
-        return cast
+        service = list(services.values())[0]
+        cast = pychromecast.get_chromecast_from_cast_info(service, zconf)
+        return _try_connect(cast)
 
     except Exception as exc:
-        logger.error("Nest discovery error: %s", exc)
-        if browser is not None:
+        logger.error("Nest mDNS discovery error: %s", exc)
+        return None
+    finally:
+        if browser:
             try:
                 browser.stop_discovery()
             except Exception:
                 pass
-        return None
+        if zconf:
+            try:
+                zconf.close()
+            except Exception:
+                pass
 
 
 def _start_ngrok() -> str:
