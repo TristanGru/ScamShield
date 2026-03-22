@@ -287,3 +287,7 @@ Built at **HooHacks 2026** by students from the University of Virginia.
 ## License
 
 MIT
+
+## Sources
+
+See [SOURCES.md](SOURCES.md) for the main official documentation, APIs, and project references used in ScamShield.
