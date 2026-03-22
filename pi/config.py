@@ -54,10 +54,10 @@ CHANNELS: int = 1
 SAMPLE_WIDTH: int = 2  # 16-bit
 
 # ── Grove HAT GPIO Pins ───────────────────────────────────────────────────────
-GPIO_LED_RED_PIN: int = int(_optional("GPIO_LED_RED_PIN", "18"))
-GPIO_LED_GREEN_PIN: int = int(_optional("GPIO_LED_GREEN_PIN", "17"))
-GPIO_BUZZER_PIN: int = int(_optional("GPIO_BUZZER_PIN", "23"))
-GPIO_BUTTON_PIN: int = int(_optional("GPIO_BUTTON_PIN", "24"))
+GPIO_LED_RED_PIN: int = int(_optional("GPIO_LED_RED_PIN", "24"))
+GPIO_LED_GREEN_PIN: int = int(_optional("GPIO_LED_GREEN_PIN", "23"))
+GPIO_BUZZER_PIN: int = int(_optional("GPIO_BUZZER_PIN", "16"))   # D16
+GPIO_BUTTON_PIN: int = int(_optional("GPIO_BUTTON_PIN", "5"))    # D5
 GPIO_SOUND_SENSOR_PIN: int = int(_optional("GPIO_SOUND_SENSOR_PIN", "0"))
 
 # ── SenseCAP ──────────────────────────────────────────────────────────────────

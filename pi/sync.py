@@ -59,7 +59,7 @@ def _upsert_events(conn: psycopg.Connection, events: list[dict]) -> list[str]:
                         event["scam_score"],
                         json.dumps(event["keywords"]),
                         event["transcript"],
-                        event["sms_sent"],
+                        bool(event["sms_sent"]),
                     ),
                 )
                 synced_ids.append(event["id"])
