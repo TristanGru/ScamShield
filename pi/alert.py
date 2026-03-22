@@ -31,6 +31,8 @@ from config import (
     TEXT_ONLY_MODE,
     SKIP_SMS,
     WARNING_AUDIO_PATH,
+    PI_LAN_IP,
+    PI_API_PORT,
 )
 import db
 import hardware
@@ -66,22 +68,33 @@ def set_nest_cast(cast_device) -> None:
 # ── Alert actions (each runs in its own thread) ───────────────────────────────
 
 def _play_nest_warning() -> None:
-    """Play pre-cached ElevenLabs warning.mp3 on Google Nest via pychromecast."""
+    """Stream warning.mp3 to Nest. Chromecast cannot play file:// — must use HTTP URL."""
+    import os
+
     if TEXT_ONLY_MODE:
         logger.info(
-            "[Google Nest] (text-only) Would play on speaker:\n  file://%s",
-            WARNING_AUDIO_PATH,
+            "[Google Nest] (text-only) Would stream http://%s:%d/warning.mp3",
+            PI_LAN_IP,
+            PI_API_PORT,
         )
         return
     if _nest_cast is None:
         logger.warning("Nest not connected — skipping Nest audio (EC-002)")
         return
+
+    audio_url = f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3"
+    if not os.path.exists(WARNING_AUDIO_PATH):
+        logger.error(
+            "warning.mp3 missing — cannot play on Nest. "
+            "Fix ElevenLabs / gTTS generation at startup."
+        )
+        return
+
     try:
-        import pychromecast
         mc = _nest_cast.media_controller
-        mc.play_media(f"file://{WARNING_AUDIO_PATH}", "audio/mp3")
-        mc.block_until_active(timeout=5)
-        logger.info("Nest: playing warning audio")
+        mc.play_media(audio_url, "audio/mpeg")
+        mc.block_until_active(timeout=15)
+        logger.info("Nest: streaming %s (same audio as ElevenLabs → warning.mp3)", audio_url)
     except Exception as exc:
         logger.error("Nest audio playback failed: %s", exc)
 

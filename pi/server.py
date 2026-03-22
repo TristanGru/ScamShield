@@ -12,6 +12,7 @@ LAN-only in production (accessed server-side by Next.js via ngrok).
 No auth required — ngrok URL is kept server-side only (§16).
 """
 
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -19,11 +20,13 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 import db
 import detection
 import sync as sync_module
+from config import WARNING_AUDIO_PATH
 
 app = FastAPI(title="ScamShield Pi API", version="1.0.0")
 
@@ -69,6 +72,14 @@ class EventsListResponse(BaseModel):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/warning.mp3")
+def serve_warning_audio():
+    """MP3 served to Chromecast/Nest (must be HTTP — not file://)."""
+    if not os.path.exists(WARNING_AUDIO_PATH):
+        raise HTTPException(status_code=404, detail="warning.mp3 not generated yet")
+    return FileResponse(WARNING_AUDIO_PATH, media_type="audio/mpeg")
 
 
 @app.get("/status")

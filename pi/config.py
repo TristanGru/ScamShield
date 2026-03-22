@@ -4,6 +4,7 @@ Fails fast with a clear error message if any required variable is missing.
 """
 
 import os
+import socket
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -31,6 +32,10 @@ GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
 ELEVENLABS_API_KEY: str = _require("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID: str = _require("ELEVENLABS_VOICE_ID")
+# Optional: voice ID for Nest warning clip only (defaults to ELEVENLABS_VOICE_ID)
+_ELEVEN_WARN = os.getenv("ELEVENLABS_WARNING_VOICE_ID", "").strip()
+ELEVENLABS_WARNING_VOICE_ID: str = _ELEVEN_WARN if _ELEVEN_WARN else ELEVENLABS_VOICE_ID
+ELEVENLABS_MODEL_ID: str = _optional("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 
 # ── Twilio ────────────────────────────────────────────────────────────────────
 TWILIO_ACCOUNT_SID: str = _require("TWILIO_ACCOUNT_SID")
@@ -74,6 +79,23 @@ LED_RESET_SECONDS: int = 10
 
 # ── Warning audio cache path ──────────────────────────────────────────────────
 WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
+
+# ── Pi LAN (Nest streams warning MP3 over HTTP; Chromecast cannot use file://) ─
+def _detect_lan_ip() -> str:
+    override = os.getenv("PI_LAN_IP", "")
+    if override:
+        return override
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+PI_LAN_IP: str = _detect_lan_ip()
+PI_API_PORT: int = int(_optional("PI_API_PORT", "8000"))
 
 # ── Text-only mode (no ElevenLabs API, Nest/Chromecast, or SenseCAP serial) ───
 # Set SCAMSHIELD_TEXT_ONLY=1 for dev/demo — integrations are logged/printed as plain text.

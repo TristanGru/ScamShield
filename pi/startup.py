@@ -14,7 +14,8 @@ import time
 
 from config import (
     ELEVENLABS_API_KEY,
-    ELEVENLABS_VOICE_ID,
+    ELEVENLABS_MODEL_ID,
+    ELEVENLABS_WARNING_VOICE_ID,
     NGROK_AUTHTOKEN,
     TEXT_ONLY_MODE,
     WARNING_AUDIO_PATH,
@@ -31,6 +32,30 @@ WARNING_TEXT = (
 )
 
 
+def _mask_voice_id(voice_id: str) -> str:
+    if len(voice_id) <= 8:
+        return "****"
+    return f"{voice_id[:4]}…{voice_id[-4:]}"
+
+
+def _gtts_fallback() -> bool:
+    """Last-resort MP3 when ElevenLabs is unavailable (different voice than ElevenLabs)."""
+    try:
+        from gtts import gTTS
+
+        tts = gTTS(WARNING_TEXT, lang="en")
+        tts.save(WARNING_AUDIO_PATH)
+        logger.warning(
+            "gTTS fallback wrote %s — Nest will NOT use your ElevenLabs voice. "
+            "Fix API plan/voice or set ELEVENLABS_SKIP_WARNING=0 with a valid voice.",
+            WARNING_AUDIO_PATH,
+        )
+        return True
+    except Exception as exc:
+        logger.error("gTTS fallback failed: %s", exc)
+        return False
+
+
 def _generate_warning_audio() -> bool:
     """
     Generate ElevenLabs TTS warning.mp3 and cache it locally.
@@ -39,24 +64,39 @@ def _generate_warning_audio() -> bool:
     if TEXT_ONLY_MODE:
         logger.info(
             "[ElevenLabs] (text-only) Would synthesize MP3 → %s\n"
-            "Voice ID from env | model eleven_multilingual_v2\n"
+            "Voice %s | model %s\n"
             "Script:\n%s",
             WARNING_AUDIO_PATH,
+            _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
+            ELEVENLABS_MODEL_ID,
             WARNING_TEXT,
         )
         return False
 
     if os.getenv("ELEVENLABS_SKIP_WARNING", "").lower() in ("1", "true", "yes"):
-        logger.warning(
-            "ELEVENLABS_SKIP_WARNING set — skipping ElevenLabs (no warning.mp3; use Nest fallback)"
-        )
-        return False
+        logger.warning("ELEVENLABS_SKIP_WARNING set — using gTTS (not ElevenLabs voice)")
+        return _gtts_fallback()
+
+    if os.getenv("ELEVENLABS_REGENERATE_WARNING", "").lower() in ("1", "true", "yes"):
+        try:
+            if os.path.exists(WARNING_AUDIO_PATH):
+                os.remove(WARNING_AUDIO_PATH)
+                logger.info("Removed cached warning.mp3 (ELEVENLABS_REGENERATE_WARNING=1)")
+        except OSError as exc:
+            logger.warning("Could not remove old warning.mp3: %s", exc)
 
     if os.path.exists(WARNING_AUDIO_PATH):
-        logger.info("warning.mp3 already cached — skipping generation")
+        logger.info(
+            "warning.mp3 already cached — skipping generation "
+            "(delete file or set ELEVENLABS_REGENERATE_WARNING=1 to rebuild with new voice)"
+        )
         return True
 
-    logger.info("Generating ElevenLabs warning audio…")
+    logger.info(
+        "Generating ElevenLabs warning audio (voice=%s, model=%s)…",
+        _mask_voice_id(ELEVENLABS_WARNING_VOICE_ID),
+        ELEVENLABS_MODEL_ID,
+    )
     try:
         from elevenlabs.client import ElevenLabs
         from elevenlabs.play import save
@@ -64,8 +104,8 @@ def _generate_warning_audio() -> bool:
         client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
         audio = client.text_to_speech.convert(
             text=WARNING_TEXT,
-            voice_id=ELEVENLABS_VOICE_ID,
-            model_id="eleven_multilingual_v2",
+            voice_id=ELEVENLABS_WARNING_VOICE_ID,
+            model_id=ELEVENLABS_MODEL_ID,
             output_format="mp3_44100_128",
         )
         save(audio, WARNING_AUDIO_PATH)
@@ -76,11 +116,11 @@ def _generate_warning_audio() -> bool:
         err_s = str(exc).lower()
         if "402" in str(exc) or "payment_required" in err_s or "paid_plan" in err_s:
             logger.error(
-                "ElevenLabs blocked (plan/voice) — set ELEVENLABS_SKIP_WARNING=1 or change "
-                "ELEVENLABS_VOICE_ID; Nest will use fallback. Details: %s",
+                "ElevenLabs blocked (402) — free tier cannot use some library voices via API. "
+                "Use a voice under My Voices / Instant Voice, or upgrade. Falling back to gTTS. %s",
                 exc,
             )
-            return False
+            return _gtts_fallback()
         logger.error("ElevenLabs generation failed: %s — retrying once (EC-011)", exc)
         time.sleep(5)
         try:
@@ -90,16 +130,16 @@ def _generate_warning_audio() -> bool:
             client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
             audio = client.text_to_speech.convert(
                 text=WARNING_TEXT,
-                voice_id=ELEVENLABS_VOICE_ID,
-                model_id="eleven_multilingual_v2",
+                voice_id=ELEVENLABS_WARNING_VOICE_ID,
+                model_id=ELEVENLABS_MODEL_ID,
                 output_format="mp3_44100_128",
             )
             save(audio, WARNING_AUDIO_PATH)
             logger.info("warning.mp3 saved (retry succeeded)")
             return True
         except Exception as retry_exc:
-            logger.error("ElevenLabs retry failed: %s — Nest will use native TTS fallback", retry_exc)
-            return False
+            logger.error("ElevenLabs retry failed: %s — trying gTTS", retry_exc)
+            return _gtts_fallback()
 
 
 def _discover_nest():
