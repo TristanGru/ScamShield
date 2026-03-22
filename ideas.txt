@@ -6,7 +6,13 @@ Tristan:
 
 Caleb:
 1. make speech to text better
-2. 
+2. add conversation memory / rolling summary so detection uses context from earlier in the call instead of only the current chunk
+3. improve scam scoring so repeating one keyword over and over does not artificially raise confidence
+4. add a trusted contacts management flow so family members can update alert recipients without editing env files
+5. make the dashboard show clearer device health info such as last seen time, tunnel status, and whether SMS / Nest / SenseCAP are connected
+6. add a safer alert acknowledgment flow so once a high-confidence scam is detected, it stays active until the user or family explicitly clears it
+7. store short reasons / evidence for why a call was flagged so the family dashboard explains the alert instead of only showing the transcript
+8. improve deployment reliability by making Auth0 / Vercel / custom-domain setup simpler and more automated
 
 Alex:
 1. Context only considers current frame. Gemini should have a summary of the conversation beforehand to provide better context and reduce false positives.
