@@ -28,6 +28,7 @@ def _optional(key: str, default: str) -> str:
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
+GEMINI_MODEL: str = _optional("GEMINI_MODEL", "gemini-3.1-flash-lite-preview").strip()
 
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
 ELEVENLABS_API_KEY: str = _require("ELEVENLABS_API_KEY")

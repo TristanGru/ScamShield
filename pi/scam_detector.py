@@ -18,6 +18,7 @@ from google import genai
 try:
     from pi.config import (
         GEMINI_API_KEY,
+        GEMINI_MODEL,
         SCAM_SCORE_THRESHOLD,
         SCAM_KEYWORD_MIN_MATCHES,
         SKIP_GEMINI,
@@ -26,6 +27,7 @@ try:
 except ImportError:
     from config import (
         GEMINI_API_KEY,
+        GEMINI_MODEL,
         SCAM_SCORE_THRESHOLD,
         SCAM_KEYWORD_MIN_MATCHES,
         SKIP_GEMINI,
@@ -87,7 +89,7 @@ def _call_gemini(text: str) -> Optional[dict]:
         prompt = f"{_SYSTEM_PROMPT}\n\nTranscript:\n{text}"
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-06-17",
+            model=GEMINI_MODEL,
             contents=prompt,
         )
 

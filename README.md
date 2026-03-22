@@ -219,6 +219,7 @@ Copy `pi/.env.example` to `pi/.env` and fill in:
 | Variable | Description |
 |----------|-------------|
 | `GEMINI_API_KEY` | Google Gemini API key |
+| `GEMINI_MODEL` | Optional. Model ID for scam detection (default: `gemini-3.1-flash-lite-preview`) |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key |
 | `ELEVENLABS_VOICE_ID` | Optional. Defaults to premade **Adam** (male, `pNInz6obpgDQGcFmaJgB`), which works on the **free** API tier. Voice Library IDs need a paid plan. |
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
