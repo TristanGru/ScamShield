@@ -78,6 +78,11 @@ SENSECAP_BAUD_RATE: int = int(_optional("SENSECAP_BAUD_RATE", "115200"))
 SCAM_SCORE_THRESHOLD: int = int(_optional("SCAM_SCORE_THRESHOLD", "75"))
 SCAM_KEYWORD_MIN_MATCHES: int = int(_optional("SCAM_KEYWORD_MIN_MATCHES", "2"))
 SMS_DEBOUNCE_SECONDS: int = int(_optional("SMS_DEBOUNCE_SECONDS", "60"))
+ALERT_COOLDOWN_SECONDS: int = int(_optional("SCAM_ALERT_COOLDOWN", "30"))
+
+# ── Conversation context (rolling transcript buffer for Gemini) ───────────────
+CONTEXT_CHUNKS: int = int(_optional("SCAM_CONTEXT_CHUNKS", "5"))
+CONTEXT_SILENCE_RESET: int = int(_optional("SCAM_CONTEXT_SILENCE_RESET", "3"))
 
 # ── LED Reset Delay ───────────────────────────────────────────────────────────
 LED_RESET_SECONDS: int = 10

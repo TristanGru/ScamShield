@@ -42,7 +42,10 @@ GEMINI_TIMEOUT_SECONDS = 5
 
 _SYSTEM_PROMPT = """You are a scam call detection system protecting elderly phone users.
 
-Analyze the following phone call transcript and return a JSON object with:
+You will receive a rolling transcript of an ongoing phone call, with segments separated by ---.
+Score the overall scam likelihood of the conversation so far.
+
+Return a JSON object with:
 - "score": integer 0-100 representing scam likelihood (0=definitely not a scam, 100=definitely a scam)
 - "reason": brief string explaining the top red flag, or "none" if not a scam
 
@@ -118,9 +121,16 @@ def _keyword_match(text: str) -> list[str]:
     return matched
 
 
-def analyze_transcript(text: str) -> ScamAnalysis:
+def analyze_transcript(
+    text: str,
+    current_chunk: Optional[str] = None,
+) -> ScamAnalysis:
     """
     Full analysis: Gemini score + reason, with keyword fallback when Gemini fails.
+
+    text:          Full conversation context (rolling buffer joined with ---).
+    current_chunk: If provided, keywords are matched against this only (avoids
+                   re-matching old chunks). If None, keywords run on `text`.
     """
     global _chunks_processed
     _chunks_processed += 1
@@ -133,7 +143,8 @@ def analyze_transcript(text: str) -> ScamAnalysis:
             matched_keywords=[],
         )
 
-    matched_keywords = _keyword_match(text)
+    kw_source = current_chunk if current_chunk is not None else text
+    matched_keywords = _keyword_match(kw_source)
     keyword_score = min(100, len(matched_keywords) * 30)
 
     gemini_result = _call_gemini(text)
@@ -155,9 +166,12 @@ def analyze_transcript(text: str) -> ScamAnalysis:
     )
 
 
-def score_transcript(text: str) -> tuple[int, list[str]]:
+def score_transcript(
+    text: str,
+    current_chunk: Optional[str] = None,
+) -> tuple[int, list[str]]:
     """Backward-compatible (score 0–100, matched keywords)."""
-    a = analyze_transcript(text)
+    a = analyze_transcript(text, current_chunk=current_chunk)
     return a.score, a.matched_keywords
 
 

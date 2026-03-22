@@ -13,6 +13,7 @@ import os
 import queue
 import signal
 import threading
+from collections import deque
 
 import uvicorn
 
@@ -24,6 +25,7 @@ import sync as sync_module
 from audio_capture import AudioCapture
 from hardware import setup_manual_button
 from startup import run_startup
+from config import CONTEXT_CHUNKS, CONTEXT_SILENCE_RESET
 
 import detection
 
@@ -40,18 +42,22 @@ _shutdown_event = threading.Event()
 
 
 def _on_button_press(channel: int) -> None:
-    """Physical button → same alert chain as auto-detection (PRD Phase 1)."""
-    logger.info("Manual button press detected (GPIO %d)", channel)
-    threading.Thread(
-        target=alert.fire_alert,
-        kwargs={
-            "trigger_type": "manual",
-            "score": None,
-            "keywords": [],
-            "transcript": "(Manual trigger by user)",
-        },
-        daemon=True,
-    ).start()
+    """Physical button: clear active alert, or fire manual alert if idle."""
+    logger.info("Button press detected (GPIO %d)", channel)
+    if alert.is_alert_active():
+        alert.clear_alert()
+        logger.info("Alert cleared by button press")
+    else:
+        threading.Thread(
+            target=alert.fire_alert,
+            kwargs={
+                "trigger_type": "manual",
+                "score": None,
+                "keywords": [],
+                "transcript": "(Manual trigger by user)",
+            },
+            daemon=True,
+        ).start()
 
 
 def _start_api_server() -> None:
@@ -70,10 +76,18 @@ def _start_api_server() -> None:
 def _processing_loop(capture: AudioCapture) -> None:
     """
     Main loop: drain chunk_queue → transcribe → score → alert.
+
+    A rolling deque keeps the last CONTEXT_CHUNKS transcripts so Gemini
+    sees multi-chunk conversation context.  Keywords are matched against
+    the current chunk only (via current_chunk param) to avoid re-triggering
+    on old text.
     """
     logger.info("Audio processing loop started")
     server_module.set_listening(True)
     sensecap.set_listening()
+
+    transcript_buffer: deque[str] = deque(maxlen=CONTEXT_CHUNKS)
+    silence_count = 0
 
     while not _shutdown_event.is_set():
         try:
@@ -82,14 +96,28 @@ def _processing_loop(capture: AudioCapture) -> None:
             continue
 
         transcript = stt.transcribe(wav_bytes)
+
         if not transcript.strip():
+            silence_count += 1
+            if silence_count >= CONTEXT_SILENCE_RESET and transcript_buffer:
+                logger.debug(
+                    "Silence reset (%d empty chunks) — clearing transcript buffer",
+                    silence_count,
+                )
+                transcript_buffer.clear()
             continue
+
+        silence_count = 0
+        transcript_buffer.append(transcript)
 
         logger.debug("Transcript: %s", transcript[:80])
         sensecap.set_transcript(transcript)
 
-        score, keywords = detection.score_transcript(transcript)
-        logger.info("Score=%d keywords=%s", score, keywords)
+        full_context = "\n---\n".join(transcript_buffer)
+        score, keywords = detection.score_transcript(
+            full_context, current_chunk=transcript,
+        )
+        logger.info("Score=%d keywords=%s (buffer=%d chunks)", score, keywords, len(transcript_buffer))
 
         if detection.should_alert(score, keywords):
             alert.fire_alert(
