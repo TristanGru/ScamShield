@@ -3,8 +3,8 @@ import { UserProvider } from "@auth0/nextjs-auth0/client";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ScamShield — Family Dashboard",
-  description: "Real-time scam call detection dashboard for your family member's safety.",
+  title: "ScamShield - Family Dashboard",
+  description: "Remote household safety dashboard for monitoring suspicious call activity.",
 };
 
 export default function RootLayout({

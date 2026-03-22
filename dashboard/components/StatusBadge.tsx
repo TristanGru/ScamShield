@@ -10,6 +10,21 @@ interface StatusData {
   last_event_at: string | null;
 }
 
+function formatLastEvent(lastEventAt: string | null): string {
+  if (!lastEventAt) return "No recent alerts";
+
+  const diffMs = Date.now() - new Date(lastEventAt).getTime();
+  const mins = Math.floor(diffMs / 60000);
+
+  if (mins < 1) return "Alert just now";
+  if (mins < 60) return `Last alert ${mins}m ago`;
+
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Last alert ${hours}h ago`;
+
+  return "Recent alert recorded";
+}
+
 export default function StatusBadge() {
   const [status, setStatus] = useState<StatusData | null>(null);
 
@@ -30,27 +45,32 @@ export default function StatusBadge() {
 
   if (!status) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-700 px-3 py-1 text-xs text-gray-300">
-        <span className="h-2 w-2 rounded-full bg-gray-500" />
-        Connecting…
-      </span>
+      <div className="status-chip status-chip--pending" aria-live="polite">
+        <span className="h-2.5 w-2.5 rounded-full bg-sky-300" />
+        Connecting to device
+      </div>
     );
   }
 
   if (!status.online) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-900/40 px-3 py-1 text-xs text-red-400">
-        <span className="h-2 w-2 rounded-full bg-red-500" />
-        Pi Offline
-      </span>
+      <div className="status-chip status-chip--offline" aria-live="polite">
+        <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
+        Device offline
+      </div>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-900/40 px-3 py-1 text-xs text-green-400">
-      <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-      {status.listening ? "Listening" : "Online"}
-      {status.nest_connected && " · Nest ✓"}
-    </span>
+    <div className="flex flex-wrap items-center gap-3" title={formatLastEvent(status.last_event_at)}>
+      <div className="status-chip status-chip--online" aria-live="polite">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-300" />
+        {status.listening ? "Listening now" : "Online"}
+      </div>
+      <div className="utility-chip text-xs">
+        {status.nest_connected ? "Nest speaker connected" : "Nest speaker pending"}
+      </div>
+      <div className="utility-chip text-xs">{formatLastEvent(status.last_event_at)}</div>
+    </div>
   );
 }

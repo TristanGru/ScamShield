@@ -13,51 +13,52 @@ export default function EventTable({ events, total, page, limit }: EventTablePro
 
   if (events.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-8 text-center">
-        <p className="text-slate-400">No events logged yet.</p>
-        <p className="mt-1 text-sm text-slate-600">Events will appear here when ScamShield detects a suspicious call.</p>
+      <div className="surface overflow-hidden">
+        <div className="grid gap-0 lg:grid-cols-[220px_1fr]">
+          <div className="border-b border-white/10 bg-white/[0.03] px-5 py-5 lg:border-b-0 lg:border-r">
+            <p className="section-label">Event Log</p>
+            <p className="mt-3 text-2xl font-semibold text-white">No activity yet</p>
+          </div>
+          <div className="px-5 py-5">
+            <p className="text-sm leading-7 text-slate-300">
+              Flagged calls, manual reports, and transcript details will appear here once the device starts receiving
+              live events from the home setup.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-2 text-xs uppercase tracking-wide text-slate-500 border-b border-slate-800">
-        <span className="w-16">Type</span>
-        <span className="w-10 text-center">Score</span>
-        <span className="flex-1">Keywords</span>
-        <span className="w-32 text-right">Time</span>
-        <span className="w-4" />
+    <div className="surface overflow-hidden">
+      <div className="hidden grid-cols-[140px_100px_1fr_180px] gap-4 border-b border-white/10 bg-white/[0.03] px-5 py-3 lg:grid">
+        <span className="section-label">Trigger</span>
+        <span className="section-label">Score</span>
+        <span className="section-label">Keywords</span>
+        <span className="section-label text-right">Recorded</span>
       </div>
 
-      <div className="rounded-b-xl border border-t-0 border-slate-800 bg-slate-900/50 overflow-hidden">
+      <div>
         {events.map((event) => (
           <EventRow key={event.id} event={event} />
         ))}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
+        <div className="flex flex-col gap-4 border-t border-white/10 px-5 py-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, total)} of {total}
           </span>
           <div className="flex gap-2">
             {page > 1 && (
-              <a
-                href={`?page=${page - 1}`}
-                className="rounded bg-slate-800 px-3 py-1 hover:bg-slate-700 transition-colors"
-              >
-                ← Prev
+              <a href={`?page=${page - 1}`} className="btn-quiet">
+                Previous page
               </a>
             )}
             {page < totalPages && (
-              <a
-                href={`?page=${page + 1}`}
-                className="rounded bg-slate-800 px-3 py-1 hover:bg-slate-700 transition-colors"
-              >
-                Next →
+              <a href={`?page=${page + 1}`} className="btn-quiet">
+                Next page
               </a>
             )}
           </div>
