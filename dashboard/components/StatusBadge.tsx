@@ -22,7 +22,7 @@ function formatLastEvent(lastEventAt: string | null): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `Last alert ${hours}h ago`;
 
-  return "Recent alert recorded";
+  return "Last alert over a day ago";
 }
 
 export default function StatusBadge() {
@@ -43,34 +43,45 @@ export default function StatusBadge() {
     return () => clearInterval(interval);
   }, []);
 
+  /* ── Connecting state ─────────────────────────────────────────── */
   if (!status) {
     return (
-      <div className="status-chip status-chip--pending" aria-live="polite">
-        <span className="h-2.5 w-2.5 rounded-full bg-sky-300" />
+      <div className="status-pill status-pill--pending" aria-live="polite" aria-label="Connecting to device">
+        <span className="status-dot status-dot--pending" />
         Connecting to device
       </div>
     );
   }
 
+  /* ── Offline state ────────────────────────────────────────────── */
   if (!status.online) {
     return (
-      <div className="status-chip status-chip--offline" aria-live="polite">
-        <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
+      <div className="status-pill status-pill--offline" aria-live="polite" aria-label="Device offline">
+        <span className="status-dot status-dot--offline" />
         Device offline
       </div>
     );
   }
 
+  /* ── Online state — consolidated into one line ────────────────── */
+  const listeningLabel = status.listening ? "Listening now" : "Online";
+  const nestLabel = status.nest_connected ? "Nest connected" : "Nest pending";
+  const lastLabel = formatLastEvent(status.last_event_at);
+
   return (
-    <div className="flex flex-wrap items-center gap-3" title={formatLastEvent(status.last_event_at)}>
-      <div className="status-chip status-chip--online" aria-live="polite">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-300" />
-        {status.listening ? "Listening now" : "Online"}
+    <div className="flex flex-wrap items-center gap-2" aria-live="polite">
+      <div
+        className="status-pill status-pill--online"
+        title={`${listeningLabel} · ${nestLabel} · ${lastLabel}`}
+      >
+        <span
+          className="status-dot status-dot--online"
+          style={{ animation: status.listening ? "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite" : "none" }}
+        />
+        {listeningLabel}
       </div>
-      <div className="utility-chip text-xs">
-        {status.nest_connected ? "Nest speaker connected" : "Nest speaker pending"}
-      </div>
-      <div className="utility-chip text-xs">{formatLastEvent(status.last_event_at)}</div>
+      <span className="chip">{nestLabel}</span>
+      <span className="chip">{lastLabel}</span>
     </div>
   );
 }

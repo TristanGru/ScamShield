@@ -8,57 +8,122 @@ interface EventTableProps {
   limit: number;
 }
 
+/* ── Empty state ──────────────────────────────────────────────────────── */
+function EmptyState() {
+  return (
+    <div className="surface" style={{ overflow: "hidden" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "180px 1fr",
+        }}
+        className="block sm:grid"
+      >
+        {/* Left — label */}
+        <div
+          style={{
+            padding: "20px",
+            borderRight: "1px solid var(--color-line-subtle)",
+            backgroundColor: "rgba(255,255,255,0.02)",
+          }}
+        >
+          <p className="kicker">Event log</p>
+          <p
+            style={{
+              marginTop: "12px",
+              fontSize: "18px",
+              fontWeight: 600,
+              color: "var(--color-ink-primary)",
+              lineHeight: 1.2,
+            }}
+          >
+            No activity yet
+          </p>
+        </div>
+        {/* Right — explanation */}
+        <div style={{ padding: "20px" }}>
+          <p
+            style={{
+              fontSize: "14px",
+              lineHeight: 1.65,
+              color: "var(--color-ink-secondary)",
+            }}
+          >
+            Flagged calls, manual reports, and call transcripts will appear here once
+            the device begins receiving live events from the home setup.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EventTable({ events, total, page, limit }: EventTableProps) {
   const totalPages = Math.ceil(total / limit);
 
   if (events.length === 0) {
-    return (
-      <div className="surface overflow-hidden">
-        <div className="grid gap-0 lg:grid-cols-[220px_1fr]">
-          <div className="border-b border-white/10 bg-white/[0.03] px-5 py-5 lg:border-b-0 lg:border-r">
-            <p className="section-label">Event Log</p>
-            <p className="mt-3 text-2xl font-semibold text-white">No activity yet</p>
-          </div>
-          <div className="px-5 py-5">
-            <p className="text-sm leading-7 text-slate-300">
-              Flagged calls, manual reports, and transcript details will appear here once the device starts receiving
-              live events from the home setup.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <EmptyState />;
   }
 
   return (
-    <div className="surface overflow-hidden">
-      <div className="hidden grid-cols-[140px_100px_1fr_180px] gap-4 border-b border-white/10 bg-white/[0.03] px-5 py-3 lg:grid">
-        <span className="section-label">Trigger</span>
-        <span className="section-label">Score</span>
-        <span className="section-label">Keywords</span>
-        <span className="section-label text-right">Recorded</span>
+    <div className="surface" style={{ overflow: "hidden" }}>
+
+      {/* ── Column header ─────────────────────────────────────────── */}
+      <div
+        className="hidden lg:grid"
+        style={{
+          gridTemplateColumns: "130px 72px 1fr 160px 20px",
+          gap: "16px",
+          padding: "10px 20px",
+          borderBottom: "1px solid var(--color-line-subtle)",
+          backgroundColor: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <span className="kicker">Trigger</span>
+        <span className="kicker">Score</span>
+        <span className="kicker">Keywords</span>
+        <span className="kicker" style={{ textAlign: "right" }}>Recorded</span>
+        <span />
       </div>
 
+      {/* ── Event rows ────────────────────────────────────────────── */}
       <div>
         {events.map((event) => (
           <EventRow key={event.id} event={event} />
         ))}
       </div>
 
+      {/* ── Pagination ────────────────────────────────────────────── */}
       {totalPages > 1 && (
-        <div className="flex flex-col gap-4 border-t border-white/10 px-5 py-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, total)} of {total}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "12px",
+            padding: "14px 20px",
+            borderTop: "1px solid var(--color-line-subtle)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "13px",
+              color: "var(--color-ink-muted)",
+            }}
+          >
+            Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total} events
           </span>
-          <div className="flex gap-2">
+
+          <div style={{ display: "flex", gap: "8px" }}>
             {page > 1 && (
               <a href={`?page=${page - 1}`} className="btn-quiet">
-                Previous page
+                ← Previous
               </a>
             )}
             {page < totalPages && (
               <a href={`?page=${page + 1}`} className="btn-quiet">
-                Next page
+                Next →
               </a>
             )}
           </div>
