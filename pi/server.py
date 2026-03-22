@@ -76,10 +76,22 @@ def health():
 
 @app.get("/warning.mp3")
 def serve_warning_audio():
-    """Serve the cached ElevenLabs warning MP3 to Chromecast/Nest devices."""
+    """Serve the ElevenLabs warning MP3 to Chromecast/Nest devices.
+
+    Alerts overwrite this file with new TTS; Chromecasts often cache by URL, so callers
+    should use a cache-busting query (see alert._play_nest_warning). We also forbid
+    HTTP caching so each request reads the current bytes from disk.
+    """
     if not os.path.exists(WARNING_AUDIO_PATH):
         raise HTTPException(status_code=404, detail="warning.mp3 not yet generated")
-    return FileResponse(WARNING_AUDIO_PATH, media_type="audio/mpeg")
+    return FileResponse(
+        WARNING_AUDIO_PATH,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @app.get("/status")

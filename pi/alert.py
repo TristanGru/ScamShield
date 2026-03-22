@@ -133,7 +133,11 @@ def _play_nest_warning(
             if not gtts_write_mp3(script, WARNING_AUDIO_PATH):
                 return
 
-    audio_url = f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3"
+    # Chromecast aggressively caches media by URL; dynamic alerts reuse the same path.
+    # Without a unique query param, Nest may replay the startup clip (stale MP3 on disk).
+    audio_url = (
+        f"http://{PI_LAN_IP}:{PI_API_PORT}/warning.mp3?v={time.time_ns()}"
+    )
     try:
         mc = _nest_cast.media_controller
         mc.play_media(audio_url, "audio/mpeg")
