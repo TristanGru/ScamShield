@@ -13,17 +13,18 @@ export default function EventTable({ events, total, page, limit }: EventTablePro
 
   if (events.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-8 text-center">
-        <p className="text-slate-400">No events logged yet.</p>
-        <p className="mt-1 text-sm text-slate-600">Events will appear here when ScamShield detects a suspicious call.</p>
+      <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.78),rgba(15,23,42,0.58))] p-8 text-center shadow-[0_24px_80px_rgba(2,6,23,0.28)]">
+        <p className="text-lg text-slate-200">No scam activity logged yet.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          Flagged calls, manual reports, and alert details will appear here once ScamShield starts receiving live events.
+        </p>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-2 text-xs uppercase tracking-wide text-slate-500 border-b border-slate-800">
+      <div className="hidden items-center gap-4 border-b border-white/10 bg-white/5 px-4 py-3 text-xs uppercase tracking-[0.22em] text-slate-500 sm:flex">
         <span className="w-16">Type</span>
         <span className="w-10 text-center">Score</span>
         <span className="flex-1">Keywords</span>
@@ -31,33 +32,32 @@ export default function EventTable({ events, total, page, limit }: EventTablePro
         <span className="w-4" />
       </div>
 
-      <div className="rounded-b-xl border border-t-0 border-slate-800 bg-slate-900/50 overflow-hidden">
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.78),rgba(15,23,42,0.58))] shadow-[0_24px_80px_rgba(2,6,23,0.28)] sm:rounded-t-none">
         {events.map((event) => (
           <EventRow key={event.id} event={event} />
         ))}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
+        <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, total)} of {total}
           </span>
           <div className="flex gap-2">
             {page > 1 && (
               <a
                 href={`?page=${page - 1}`}
-                className="rounded bg-slate-800 px-3 py-1 hover:bg-slate-700 transition-colors"
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 transition-colors hover:bg-white/10"
               >
-                ← Prev
+                Prev
               </a>
             )}
             {page < totalPages && (
               <a
                 href={`?page=${page + 1}`}
-                className="rounded bg-slate-800 px-3 py-1 hover:bg-slate-700 transition-colors"
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 transition-colors hover:bg-white/10"
               >
-                Next →
+                Next
               </a>
             )}
           </div>

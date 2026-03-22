@@ -18,31 +18,34 @@ interface AlertBannerProps {
 export default function AlertBanner({ event, total }: AlertBannerProps) {
   if (!event) {
     return (
-      <div className="rounded-xl border border-green-800/40 bg-green-900/20 p-4">
-        <p className="text-sm text-green-400">✓ No alerts detected. System is monitoring.</p>
+      <div className="rounded-3xl border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(5,46,22,0.18))] p-5 shadow-[0_24px_80px_rgba(6,78,59,0.24)]">
+        <p className="text-sm font-medium uppercase tracking-[0.24em] text-emerald-200">All clear</p>
+        <p className="mt-2 text-sm leading-6 text-emerald-100/90">
+          ScamShield is monitoring for suspicious calls and will alert trusted contacts if something looks wrong.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-red-700/60 bg-red-900/20 p-5">
+    <div className="rounded-3xl border border-red-500/25 bg-[linear-gradient(135deg,rgba(127,29,29,0.5),rgba(69,10,10,0.28))] p-5 shadow-[0_24px_80px_rgba(127,29,29,0.24)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-red-400">⚠ Scam Detected</span>
+            <span className="text-lg font-bold text-red-200">Scam Detected</span>
             {event.trigger_type === "manual" && (
-              <span className="rounded-full bg-amber-900/50 px-2 py-0.5 text-xs text-amber-400">
+              <span className="rounded-full border border-amber-300/10 bg-amber-900/40 px-2 py-0.5 text-xs text-amber-200">
                 Manual Report
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-slate-300 line-clamp-2">{event.transcript}</p>
+          <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-200">{event.transcript}</p>
           {event.keywords.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {event.keywords.map((kw) => (
                 <span
                   key={kw}
-                  className="rounded-full bg-red-800/50 px-2 py-0.5 text-xs text-red-300"
+                  className="rounded-full border border-red-400/10 bg-red-800/40 px-2 py-0.5 text-xs text-red-100"
                 >
                   {kw}
                 </span>
@@ -51,13 +54,13 @@ export default function AlertBanner({ event, total }: AlertBannerProps) {
           )}
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-xs text-slate-400">{formatRelative(event.created_at)}</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-red-200/70">{formatRelative(event.created_at)}</p>
           {event.scam_score != null && (
-            <p className="mt-1 text-2xl font-bold text-red-400">{event.scam_score}%</p>
+            <p className="mt-2 text-3xl font-bold text-red-100">{event.scam_score}%</p>
           )}
         </div>
       </div>
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-4 text-xs uppercase tracking-[0.22em] text-red-100/55">
         {total} total alert{total !== 1 ? "s" : ""} logged
       </p>
     </div>
