@@ -78,3 +78,7 @@ WARNING_AUDIO_PATH: str = str(Path(__file__).parent / "warning.mp3")
 # ── Text-only mode (no ElevenLabs API, Nest/Chromecast, or SenseCAP serial) ───
 # Set SCAMSHIELD_TEXT_ONLY=1 for dev/demo — integrations are logged/printed as plain text.
 TEXT_ONLY_MODE: bool = _optional("SCAMSHIELD_TEXT_ONLY", "0").lower() in ("1", "true", "yes")
+
+# ── Testing / dev safety switches ─────────────────────────────────────────────
+SKIP_SMS: bool = _optional("SCAMSHIELD_SKIP_SMS", "0").lower() in ("1", "true", "yes")
+SKIP_GEMINI: bool = _optional("SCAMSHIELD_SKIP_GEMINI", "0").lower() in ("1", "true", "yes")

@@ -29,6 +29,7 @@ from config import (
     SMS_DEBOUNCE_SECONDS,
     LED_RESET_SECONDS,
     TEXT_ONLY_MODE,
+    SKIP_SMS,
     WARNING_AUDIO_PATH,
 )
 import db
@@ -93,6 +94,10 @@ def _led_and_buzzer() -> None:
 def _send_sms(keywords: list[str], trigger_type: str, transcript: str) -> bool:
     """Send Twilio SMS with debounce (BL-004). Returns True if sent."""
     global _last_sms_time, _sms_sent_count
+
+    if SKIP_SMS:
+        logger.info("[SMS] SCAMSHIELD_SKIP_SMS=1 — skipping Twilio (trigger=%s score=%s)", trigger_type, score)
+        return False
 
     with _sms_lock:
         now = time.time()
