@@ -67,7 +67,7 @@ def _call_gemini(text: str) -> Optional[dict]:
         prompt = f"{_SYSTEM_PROMPT}\n\nTranscript:\n{text}"
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash-lite-preview-06-17",
             contents=prompt,
         )
 
