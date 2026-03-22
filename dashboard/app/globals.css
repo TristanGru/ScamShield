@@ -2,47 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── CSS Custom Properties ─────────────────────────────────────────── */
 :root {
-  --bg-canvas: #08111d;
-  --bg-deep: #10192a;
-  --bg-panel: #121d30;
-  --bg-panel-strong: #172338;
-  --line-subtle: rgba(148, 163, 184, 0.14);
-  --line-strong: rgba(148, 163, 184, 0.22);
-  --text-primary: #ecf3ff;
-  --text-secondary: #a5b2c7;
-  --text-muted: #70819c;
-  --accent-safe: #4ecb83;
-  --accent-watch: #f0b24b;
-  --accent-alert: #e76d67;
-  --accent-info: #72b5ff;
-  --shadow-panel: 0 20px 50px rgba(1, 6, 16, 0.28);
-  --shadow-soft: 0 8px 24px rgba(1, 6, 16, 0.16);
+  /* Background hierarchy */
+  --color-canvas:       #080e18;
+  --color-base:         #0d1525;
+  --color-surface:      #111e33;
+  --color-surface-raised: #162540;
+
+  /* Borders */
+  --color-line-subtle:  rgba(255, 255, 255, 0.06);
+  --color-line-strong:  rgba(255, 255, 255, 0.10);
+  --color-line-accent:  rgba(59, 130, 246, 0.30);
+
+  /* Text */
+  --color-ink-primary:   #eef2ff;
+  --color-ink-secondary: #8fa3c0;
+  --color-ink-muted:     #4e6380;
+
+  /* Accent — trust blue */
+  --color-accent:       #3b82f6;
+  --color-accent-dim:   rgba(59, 130, 246, 0.12);
+  --color-accent-hover: #2563eb;
+
+  /* Semantic feedback */
+  --color-safe:         #22c55e;
+  --color-safe-dim:     rgba(34, 197, 94, 0.10);
+  --color-safe-text:    #86efac;
+
+  --color-watch:        #f59e0b;
+  --color-watch-dim:    rgba(245, 158, 11, 0.10);
+  --color-watch-text:   #fcd34d;
+
+  --color-threat:       #ef4444;
+  --color-threat-dim:   rgba(239, 68, 68, 0.10);
+  --color-threat-text:  #fca5a5;
+
+  /* Surfaces */
+  --shadow-surface:       0 1px 3px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-surface-raised: 0 4px 12px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.08);
+
+  /* Radius — two intentional values */
+  --radius-chip:  2px;
+  --radius-panel: 8px;
+}
+
+/* ─── Base Reset & Typography Foundation ─────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html {
   min-height: 100%;
-  background:
-    radial-gradient(circle at top left, rgba(78, 203, 131, 0.08), transparent 26%),
-    radial-gradient(circle at top right, rgba(114, 181, 255, 0.08), transparent 22%),
-    linear-gradient(180deg, #09111d 0%, #0b1422 52%, #08101a 100%);
+  background-color: var(--color-canvas);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    linear-gradient(180deg, rgba(8, 17, 29, 0.96) 0%, rgba(10, 19, 31, 0.98) 100%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.015) 0,
-      rgba(255, 255, 255, 0.015) 1px,
-      transparent 1px,
-      transparent 96px
-    );
-  color: var(--text-primary);
-  font-family: "Aptos", "Segoe UI", "Trebuchet MS", sans-serif;
-  text-rendering: optimizeLegibility;
+  background-color: var(--color-canvas);
+  color: var(--color-ink-primary);
+  font-family:
+    var(--font-inter, "Inter"),
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
 }
 
 a {
@@ -50,85 +86,235 @@ a {
   text-decoration: none;
 }
 
+/* Text selection */
 ::selection {
-  background: rgba(114, 181, 255, 0.22);
+  background: rgba(59, 130, 246, 0.25);
   color: #ffffff;
 }
 
+/* Focus visible — never remove, always offset */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Component Layer ────────────────────────────────────────────────── */
 @layer components {
+
+  /* Layout container */
   .shell-wrap {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
   }
 
-  .section-label {
-    color: var(--text-muted);
-    letter-spacing: 0.28em;
-    @apply text-[11px] font-semibold uppercase;
-  }
-
+  /* ── Surface system ─────────────────────────────────────────────── */
+  /* Base surface: panels, cards */
   .surface {
-    background: linear-gradient(180deg, rgba(18, 29, 48, 0.95) 0%, rgba(14, 24, 39, 0.95) 100%);
-    border: 1px solid var(--line-subtle);
-    box-shadow: var(--shadow-panel);
-    @apply rounded-3xl;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line-subtle);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-surface);
   }
 
-  .surface-strong {
-    background: linear-gradient(180deg, rgba(23, 35, 56, 0.98) 0%, rgba(17, 28, 45, 0.98) 100%);
-    border: 1px solid var(--line-strong);
-    box-shadow: var(--shadow-panel);
-    @apply rounded-3xl;
+  /* Elevated surface: secondary panels, asides */
+  .surface-raised {
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-surface-raised);
   }
 
-  .utility-chip {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--line-subtle);
-    color: var(--text-secondary);
-    @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm;
+  /* ── Typography primitives ──────────────────────────────────────── */
+  /* Section kicker — sparse, uppercase, tracking */
+  .kicker {
+    display: block;
+    color: var(--color-ink-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
   }
 
-  .status-chip {
-    border: 1px solid transparent;
-    @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium;
-  }
-
-  .status-chip--offline {
-    background: rgba(231, 109, 103, 0.12);
-    border-color: rgba(231, 109, 103, 0.2);
-    color: #ffb1ad;
-  }
-
-  .status-chip--online {
-    background: rgba(78, 203, 131, 0.1);
-    border-color: rgba(78, 203, 131, 0.18);
-    color: #b7f2cc;
-  }
-
-  .status-chip--pending {
-    background: rgba(114, 181, 255, 0.1);
-    border-color: rgba(114, 181, 255, 0.18);
-    color: #c8e1ff;
-  }
-
+  /* ── Interactive primitives ─────────────────────────────────────── */
+  /* Quiet button — low-emphasis action */
   .btn-quiet {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--line-subtle);
-    color: var(--text-primary);
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-150;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    min-height: 36px;
+    background-color: transparent;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-chip);
+    color: var(--color-ink-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    white-space: nowrap;
+    text-decoration: none;
   }
 
   .btn-quiet:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: var(--color-line-strong);
+    color: var(--color-ink-primary);
   }
 
-  .btn-quiet:focus-visible,
+  .btn-quiet:active {
+    background-color: rgba(255, 255, 255, 0.07);
+  }
+
+  /* Primary button — accent-colored, high emphasis */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 18px;
+    min-height: 44px;
+    background-color: var(--color-accent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-chip);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+    text-decoration: none;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-accent-hover);
+  }
+
+  .btn-primary:active {
+    background-color: #1d4ed8;
+  }
+
+  /* ── Chip / tag system ──────────────────────────────────────────── */
+  /* Utility chip — metadata, counts, email display */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--color-line-subtle);
+    border-radius: var(--radius-chip);
+    color: var(--color-ink-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* Keyword tag — inline text tag within event rows */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 7px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-line-subtle);
+    border-radius: var(--radius-chip);
+    color: var(--color-ink-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* Tag variants for threat severity */
+  .tag-threat {
+    background-color: var(--color-threat-dim);
+    border-color: rgba(239, 68, 68, 0.18);
+    color: var(--color-threat-text);
+  }
+
+  /* ── Status indicator pills ─────────────────────────────────────── */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-chip);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .status-pill--online {
+    background-color: var(--color-safe-dim);
+    border-color: rgba(34, 197, 94, 0.18);
+    color: var(--color-safe-text);
+  }
+
+  .status-pill--offline {
+    background-color: var(--color-threat-dim);
+    border-color: rgba(239, 68, 68, 0.18);
+    color: var(--color-threat-text);
+  }
+
+  .status-pill--pending {
+    background-color: var(--color-accent-dim);
+    border-color: var(--color-line-accent);
+    color: #93c5fd;
+  }
+
+  /* Status dot — animated presence indicator */
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot--online {
+    background-color: var(--color-safe);
+  }
+
+  .status-dot--offline {
+    background-color: var(--color-threat);
+  }
+
+  .status-dot--pending {
+    background-color: var(--color-accent);
+  }
+
+  /* ── Interactive row ────────────────────────────────────────────── */
+  .interactive-row {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+
+  .interactive-row:hover {
+    background-color: rgba(255, 255, 255, 0.025);
+  }
+
   .interactive-row:focus-visible {
-    outline: 2px solid rgba(114, 181, 255, 0.75);
-    outline-offset: 2px;
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
   }
 
-  .kicker {
-    color: var(--text-muted);
-    @apply text-[11px] font-semibold uppercase tracking-[0.22em];
-  }
 }

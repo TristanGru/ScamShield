@@ -41,7 +41,7 @@ export async function fetchEvents(
   if (triggerType) params.set("trigger_type", triggerType);
 
   const res = await fetch(`${PI_API_URL}/events?${params}`, {
-    next: { revalidate: 10 },
+    cache: "no-store",
   });
 
   if (!res.ok) {
