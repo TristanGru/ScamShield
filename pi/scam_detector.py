@@ -231,7 +231,11 @@ def generate_nest_voice_script(
     """
     Ask Gemini for spoken Nest audio text from conversation context + score/reason.
     Falls back to NEST_WARNING_TEXT if Gemini is off, manual test without context, or on error.
-    Sanitizes against SCAM_KEYWORDS so the mic does not re-trigger.
+
+    We intentionally do NOT run SCAM_KEYWORDS on the script: defensive wording often mentions
+    the same terms as scams (e.g. "virus", "gift cards", "tech support"), which previously
+    forced the static default every time. Echo/re-trigger risk is mitigated by the prompt,
+    alert cooldown, and chunk-based keyword scoring on the mic path.
     """
     safe_default = NEST_WARNING_TEXT.strip()
 
@@ -265,13 +269,6 @@ def generate_nest_voice_script(
         if len(script) > 1200:
             script = script[:1200].rsplit(" ", 1)[0] + "…"
         if not script:
-            return safe_default
-        bad = _keyword_match(script)
-        if bad:
-            logger.warning(
-                "Nest script matched detector keywords %s — using default safe text",
-                bad[:8],
-            )
             return safe_default
         logger.info("Nest voice script (%d chars): %s…", len(script), script[:80])
         return script

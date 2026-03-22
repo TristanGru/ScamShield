@@ -64,3 +64,27 @@ def test_confidence_is_score_over_100():
     with patch.object(sd, "_call_gemini", return_value={"score": 75, "reason": "ok"}):
         a = sd.analyze_transcript("Some transcript with enough text.")
     assert a.confidence == 0.75
+
+
+def test_generate_nest_voice_script_keeps_text_with_detection_like_keywords():
+    """Nest TTS must not reject scripts that mention 'virus', 'gift card', etc. in a safety tone."""
+    from pi import scam_detector as sd
+
+    mock_resp = MagicMock()
+    mock_resp.text = (
+        "This may be a tech-support scam about a computer virus. "
+        "Hang up and do not buy gift cards."
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_resp
+
+    with patch.object(sd, "SKIP_GEMINI", False):
+        with patch.object(sd, "_get_client", return_value=mock_client):
+            out = sd.generate_nest_voice_script(
+                "caller says computer virus pay five million",
+                score=85,
+                reason="tech support scam",
+                trigger_type="auto",
+            )
+    assert "virus" in out.lower()
+    assert out.strip() != sd.NEST_WARNING_TEXT.strip()
